@@ -1,0 +1,10 @@
+<Project>
+    <PropertyGroup>
+        <LangVersion>preview</LangVersion>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="LanguageExt.Core" Version="4.4.8" />
+        <PackageReference Include="RZ.Foundation" Version="6.3.1" />
+        <Compile Include="../CommonGlobalUsings.cs" />
+    </ItemGroup>
+</Project>

@@ -1,0 +1,39 @@
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
+using Serilog;
+using Tirax.TunnelSpace.EffHelpers;
+using Tirax.TunnelSpace.ViewModels;
+using Tirax.TunnelSpace.Views;
+
+namespace Tirax.TunnelSpace;
+
+public partial class App(ServiceProviderEff sp) : Application
+{
+    public App() : this(default) {}
+
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+    }
+
+    public override void OnFrameworkInitializationCompleted() {
+        var init = from logger in sp.GetRequiredService<ILogger>()
+                   from _1 in Ssh.Initialize(logger)
+                   from _2 in Init()
+                   select unit;
+        init.Run().ThrowIfFail();
+
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    Eff<Unit> Init() =>
+        Eff(() => {
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.MainWindow = new MainWindow
+                {
+                    DataContext = new MainWindowViewModel(),
+                };
+            return unit;
+        });
+}
