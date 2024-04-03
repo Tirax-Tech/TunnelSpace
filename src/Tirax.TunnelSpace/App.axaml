@@ -1,5 +1,8 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:themes="clr-namespace:Material.Styles.Themes;assembly=Material.Styles"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+
              x:Class="Tirax.TunnelSpace.App"
              xmlns:local="using:Tirax.TunnelSpace"
              RequestedThemeVariant="Default">
@@ -8,8 +11,9 @@
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
-  
+
     <Application.Styles>
-        <FluentTheme />
+        <themes:MaterialTheme PrimaryColor="DeepOrange" SecondaryColor="Yellow" />
+        <materialIcons:MaterialIconStyles />
     </Application.Styles>
 </Application>

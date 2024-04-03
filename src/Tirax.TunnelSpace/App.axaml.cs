@@ -8,7 +8,7 @@ using Tirax.TunnelSpace.Views;
 
 namespace Tirax.TunnelSpace;
 
-public partial class App(ServiceProviderEff sp) : Application
+public class App(ServiceProviderEff sp) : Application
 {
     public App() : this(default) {}
 

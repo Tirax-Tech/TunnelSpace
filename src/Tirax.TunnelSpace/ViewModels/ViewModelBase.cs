@@ -2,6 +2,4 @@
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public class ViewModelBase : ReactiveObject
-{
-}
+public class ViewModelBase : ReactiveObject;
