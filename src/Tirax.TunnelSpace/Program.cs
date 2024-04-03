@@ -2,8 +2,8 @@
 using Avalonia.ReactiveUI;
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Serilog;
 using Tirax.TunnelSpace.EffHelpers;
+using Tirax.TunnelSpace.Services;
 
 namespace Tirax.TunnelSpace;
 
@@ -21,19 +21,23 @@ sealed class Program
         => BuildApp().Run().ThrowIfFail();
 
     static Eff<AppBuilder> BuildApp() =>
-        Eff(() => AppBuilder.Configure(() => new App(ServiceProviderEff.Call(Container)))
+        from container in Container
+        from app in BuildApp(container)
+        select app;
+
+    static Eff<AppBuilder> BuildApp(ServiceProviderEff container) =>
+        Eff(() => AppBuilder.Configure(() => new App(container))
                             .UsePlatformDetect()
                             .WithInterFont()
                             .LogToTrace()
                             .UseReactiveUI());
 
-    static readonly IServiceProvider Container =
-        new ServiceCollection()
-            .AddSingleton(SetupLog())
-            .BuildServiceProvider();
-
-    static ILogger SetupLog() =>
-        new LoggerConfiguration()
-            .WriteTo.Console()
-            .CreateLogger();
+    static readonly Eff<ServiceProviderEff> Container =
+        from tp in SuccessEff(TimeProviderEff.System)
+        from now in tp.LocalNow
+        from logger in LogSetup.Setup(now)
+        select new ServiceProviderEff(new ServiceCollection()
+                                      .AddSingleton(tp)
+                                      .AddSingleton(logger)
+                                      .BuildServiceProvider());
 }
