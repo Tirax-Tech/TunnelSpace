@@ -1,8 +1,14 @@
-﻿namespace Tirax.TunnelSpace.ViewModels;
+﻿using ReactiveUI;
 
-public class MainWindowViewModel : ViewModelBase
+namespace Tirax.TunnelSpace.ViewModels;
+
+public sealed class MainWindowViewModel : ViewModelBase
 {
-#pragma warning disable CA1822 // Mark members as static
-    public string Greeting => "Welcome to Avalonia!";
-#pragma warning restore CA1822 // Mark members as static
+    ViewModelBase currentViewModel = new ConnectionSelectionViewModel();
+
+    public ViewModelBase CurrentViewModel
+    {
+        get => currentViewModel;
+        set => this.RaiseAndSetIfChanged(ref currentViewModel, value);
+    }
 }

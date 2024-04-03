@@ -1,0 +1,24 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:ma="using:Material.Styles.Assists"
+             xmlns:mi="using:Material.Icons.Avalonia"
+
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Tirax.TunnelSpace.Views.ConnectionSelectionView">
+    <DockPanel>
+        <TextBox UseFloatingWatermark="True" Classes="dense" Theme="{StaticResource FilledTextBox}"
+                 CornerRadius="100" Width="360" Margin="8"
+                 ma:TextFieldAssist.Label="Search connection" DockPanel.Dock="Top" />
+        <WrapPanel Margin="16">
+            <Button CornerRadius="100" HorizontalContentAlignment="Left" Height="80">
+                <DockPanel LastChildFill="True" Width="300">
+                    <mi:MaterialIcon Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
+                    <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
+                    <TextBlock>Connection 1</TextBlock>
+                </DockPanel>
+            </Button>
+        </WrapPanel>
+    </DockPanel>
+</UserControl>
