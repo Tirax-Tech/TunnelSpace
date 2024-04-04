@@ -4,21 +4,34 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ma="using:Material.Styles.Assists"
              xmlns:mi="using:Material.Icons.Avalonia"
+             xmlns:controls="using:Material.Styles.Controls"
+             xmlns:vm="using:Tirax.TunnelSpace.ViewModels"
 
+             x:DataType="vm:ConnectionSelectionViewModel"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Tirax.TunnelSpace.Views.ConnectionSelectionView">
+    <UserControl.DataContext>
+        <vm:ConnectionSelectionViewModel />
+    </UserControl.DataContext>
+
     <DockPanel>
         <TextBox UseFloatingWatermark="True" Classes="dense" Theme="{StaticResource FilledTextBox}"
                  CornerRadius="100" Width="360" Margin="8"
                  ma:TextFieldAssist.Label="Search connection" DockPanel.Dock="Top" />
-        <WrapPanel Margin="16">
-            <Button CornerRadius="100" HorizontalContentAlignment="Left" Height="80">
-                <DockPanel LastChildFill="True" Width="300">
-                    <mi:MaterialIcon Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
-                    <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
-                    <TextBlock>Connection 1</TextBlock>
-                </DockPanel>
-            </Button>
-        </WrapPanel>
+        <Canvas>
+            <WrapPanel Margin="16">
+                <Button Classes="accent" CornerRadius="100" HorizontalContentAlignment="Left" Height="80" >
+                    <DockPanel LastChildFill="True" Width="300">
+                        <mi:MaterialIcon Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
+                        <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
+                        <TextBlock>Connection 1</TextBlock>
+                    </DockPanel>
+                </Button>
+            </WrapPanel>
+            <controls:FloatingButton Width="48" Height="48" Canvas.Bottom="12" Canvas.Right="12"
+                                     Command="{Binding NewConnectionCommand}">
+                <mi:MaterialIcon Kind="Plus" />
+            </controls:FloatingButton>
+        </Canvas>
     </DockPanel>
 </UserControl>

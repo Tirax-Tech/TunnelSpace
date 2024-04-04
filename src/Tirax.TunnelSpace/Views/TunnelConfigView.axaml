@@ -1,0 +1,36 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:p1="clr-namespace:Material.Styles.Assists;assembly=Material.Styles"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Tirax.TunnelSpace.Views.TunnelConfigView">
+    <DockPanel>
+        <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
+            <mi:MaterialIcon Kind="ArrowLeft" Margin="24" Width="24" Height="24"/>
+            <TextBlock Classes="Headline5" VerticalAlignment="Center" Width="200">New connection</TextBlock>
+        </StackPanel>
+        <Button CornerRadius="100" Margin="8" Width="100" Height="40" DockPanel.Dock="Bottom">
+            <StackPanel Orientation="Horizontal">
+                <mi:MaterialIcon Kind="Upload" />
+                <TextBlock>Save</TextBlock>
+            </StackPanel>
+        </Button>
+        <Grid ColumnDefinitions="*,*"
+              RowDefinitions="Auto,Auto,Auto,Auto">
+            <TextBox UseFloatingWatermark="True" Classes="dense filled" Theme="{StaticResource FilledTextBox}"
+                     Margin="8" p1:TextFieldAssist.Label="Name" Grid.Row="0" Grid.Column="0" />
+            <TextBox UseFloatingWatermark="True" Classes="dense filled" Theme="{StaticResource FilledTextBox}"
+                     Margin="8" p1:TextFieldAssist.Label="Local Port" Grid.Row="1" Grid.Column="0" />
+            <TextBox UseFloatingWatermark="True" Classes="dense filled" Theme="{StaticResource FilledTextBox}"
+                     Margin="8" p1:TextFieldAssist.Label="SSH Host" Grid.Row="2" Grid.Column="0" />
+            <TextBox UseFloatingWatermark="True" Classes="dense filled" Theme="{StaticResource FilledTextBox}"
+                     Margin="8" p1:TextFieldAssist.Label="SSH Port" Grid.Row="2" Grid.Column="1" />
+            <TextBox UseFloatingWatermark="True" Classes="dense filled" Theme="{StaticResource FilledTextBox}"
+                     Margin="8" p1:TextFieldAssist.Label="Remote Host" Grid.Row="3" Grid.Column="0" />
+            <TextBox UseFloatingWatermark="True" Classes="dense filled" Theme="{StaticResource FilledTextBox}"
+                     Margin="8" p1:TextFieldAssist.Label="Remote Port" Grid.Row="3" Grid.Column="1" />
+        </Grid>
+    </DockPanel>
+</UserControl>
