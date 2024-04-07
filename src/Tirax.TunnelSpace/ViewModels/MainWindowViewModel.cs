@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using ReactiveUI;
 using Tirax.TunnelSpace.EffHelpers;
+using Tirax.TunnelSpace.Services;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
@@ -12,33 +14,49 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel(ServiceProviderEff sp) {
         this.sp = sp;
-        var initModel = new ConnectionSelectionViewModel();
-        history.Push(initModel);
 
-        initModel.NewConnectionCommand.Subscribe(_ => AddNewConnection());
+        CloseCurrentView = Eff(() => history.Pop());
+
+        AddNewConnection = Eff(() => {
+            var vm = CurrentViewModel;
+            var newView = new TunnelConfigViewModel();
+            history.Push(newView);
+
+            newView.Save.Subscribe(config => this.ChangeView(nameof(CurrentViewModel), CloseCurrentView).RunUnit());
+
+            this.RaiseAndSetIfChanged(ref vm, newView, nameof(CurrentViewModel));
+            return unit;
+        });
+
+        var eff =
+            from _1 in PushView(new LoadingScreenViewModel())
+            from storage in sp.GetRequiredService<ITunnelConfigStorage>()
+            from allData in storage.All
+            from initModel in SuccessEff(new ConnectionSelectionViewModel(allData))
+            from _2 in PushView(initModel)
+            from _3 in initModel.NewConnectionCommand.SubscribeEff(_ => AddNewConnection)
+            select unit;
+        Task.Run(async () => await eff.RunUnit());
     }
 
     public ViewModelBase CurrentViewModel {
         get => history.Peek();
-        set {
-            var vm = history.Peek();
-            this.RaiseAndSetIfChanged(ref vm, value);
-            history.Pop();
-            history.Push(value);
-        }
+        set => Replace(value).RunUnit();
     }
 
-    void AddNewConnection() {
-        var vm = CurrentViewModel;
-        var newView = sp.GetRequiredService<TunnelConfigViewModel>().Run().ThrowIfFail();
-        history.Push(newView);
+    Eff<Unit> AddNewConnection { get; }
 
-        newView.Save.Subscribe(_ => {
-            this.RaisePropertyChanging(nameof(CurrentViewModel));
-            history.Pop();
-            this.RaisePropertyChanged(nameof(CurrentViewModel));
+    Eff<ViewModelBase> PushView(ViewModelBase view) =>
+        Eff(() => {
+            history.Push(view);
+            return view;
         });
 
-        this.RaiseAndSetIfChanged(ref vm, newView, nameof(CurrentViewModel));
-    }
+    readonly Eff<ViewModelBase> CloseCurrentView;
+
+    Eff<ViewModelBase> Replace(ViewModelBase replacement) =>
+        this.ChangeView(nameof(CurrentViewModel),
+                        from current in CloseCurrentView
+                        from _ in PushView(replacement)
+                        select current);
 }

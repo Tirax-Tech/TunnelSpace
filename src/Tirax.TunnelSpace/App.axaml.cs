@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.ViewModels;
@@ -12,7 +13,7 @@ public class App : Application
 {
     readonly ServiceProviderEff sp;
 
-    public App() : this(default) { }
+    public App() : this(new(new ServiceCollection().BuildServiceProvider())) { }
 
     public App(ServiceProviderEff sp) {
         this.sp = sp;

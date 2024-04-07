@@ -18,7 +18,10 @@ public sealed class TunnelConfigViewModel(TunnelConfig config) : ViewModelBase
     static TunnelConfig NewConfig(Guid? id = default) =>
         new(id ?? Guid.NewGuid(), "localhost", 22, 2222, "localhost", 22, "New Tunnel");
 
-    public ReactiveCommand<RUnit, RUnit> Save { get; } = ReactiveCommand.Create(() => { });
+    public ReactiveCommand<TunnelConfig, RUnit> Save { get; } = ReactiveCommand.Create<TunnelConfig, RUnit>(config => {
+        // Save the config
+        return RUnit.Default;
+    });
 
     public string Name {
         get => name;
