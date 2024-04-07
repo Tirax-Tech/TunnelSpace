@@ -1,0 +1,12 @@
+﻿<lc:MudTheme xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:lc="using:Tirax.TunnelSpace.Controls"
+
+        x:Class="Tirax.TunnelSpace.Controls.MudTheme">
+    <Design.PreviewWith>
+        <Border Padding="20">
+            <!-- Add Controls for Previewer Here -->
+        </Border>
+    </Design.PreviewWith>
+
+</lc:MudTheme>
