@@ -1,7 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
-using RUnit = System.Reactive.Unit;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
