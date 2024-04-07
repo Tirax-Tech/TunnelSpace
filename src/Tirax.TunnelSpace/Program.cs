@@ -4,6 +4,7 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Services;
+using Tirax.TunnelSpace.ViewModels;
 
 namespace Tirax.TunnelSpace;
 
@@ -34,5 +35,11 @@ sealed class Program
 
     static readonly Eff<ServiceProviderEff> Container =
         from services in TunnelSpaceServices.Setup(new ServiceCollection())
-        select new ServiceProviderEff(services.BuildServiceProvider());
+        let provider = services
+                       .AddTransient<MainWindowViewModel>()
+                       .AddTransient<ConnectionSelectionViewModel>()
+                       .AddTransient<TunnelConfigViewModel>()
+                       .AddSingleton<ServiceProviderEff>()
+                       .BuildServiceProvider()
+        select provider.GetRequiredService<ServiceProviderEff>();
 }
