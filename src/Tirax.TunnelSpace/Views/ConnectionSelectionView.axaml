@@ -19,15 +19,31 @@
                  CornerRadius="100" Width="360" Margin="8"
                  ma:TextFieldAssist.Label="Search connection" DockPanel.Dock="Top" />
         <Canvas>
-            <WrapPanel Margin="16">
-                <Button Classes="accent" CornerRadius="100" HorizontalContentAlignment="Left" Height="80" >
-                    <DockPanel LastChildFill="True" Width="300">
-                        <mi:MaterialIcon Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
-                        <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
-                        <TextBlock>Connection 1</TextBlock>
-                    </DockPanel>
-                </Button>
-            </WrapPanel>
+            <ItemsControl ItemsSource="{Binding TunnelConfigs}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Margin="8"
+                                   Width="{Binding $parent[Canvas].Bounds.Width}"
+                                   Height="{Binding $parent[Canvas].Bounds.Height}" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Classes="accent" CornerRadius="100" Width="200" Height="60">
+                            <DockPanel LastChildFill="True" Width="200">
+                                <mi:MaterialIcon Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
+                                <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
+                                <TextBlock Text="{Binding Name}" />
+                            </DockPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+                <ItemsControl.Styles>
+                    <Style Selector="Button">
+                        <Setter Property="Margin" Value="0,0,12,12" />
+                    </Style>
+                </ItemsControl.Styles>
+            </ItemsControl>
             <controls:FloatingButton Width="48" Height="48" Canvas.Bottom="12" Canvas.Right="12"
                                      Command="{Binding NewConnectionCommand}">
                 <mi:MaterialIcon Kind="Plus" />

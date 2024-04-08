@@ -9,15 +9,15 @@ sealed class MainProgram
     readonly TunnelConfigFlow flowTunnelConfig;
     readonly ITunnelConfigStorage storage;
 
-    public MainProgram(TunnelConfigFlow flowTunnelConfig, ITunnelConfigStorage storage) {
+    public MainProgram(ConnectionSelectionFlow flowConnectionSelection, TunnelConfigFlow flowTunnelConfig, ITunnelConfigStorage storage) {
         this.flowTunnelConfig = flowTunnelConfig;
         this.storage = storage;
 
         Create =
-            from vm in Eff(() => new MainWindowViewModel())
+            from vm in SuccessEff(new MainWindowViewModel())
             let afterInit =
                 from allData in storage.All
-                from initModel in SuccessEff(new ConnectionSelectionViewModel(allData))
+                from initModel in flowConnectionSelection.Create
                 from _2 in initModel.NewConnectionCommand.SubscribeEff(_ => AddNewConnection(vm))
                 from _3 in vm.PushView(initModel)
                 select unit
