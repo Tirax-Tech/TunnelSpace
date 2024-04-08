@@ -6,12 +6,14 @@ namespace Tirax.TunnelSpace.Flows;
 
 sealed class MainProgram
 {
+    readonly TunnelConfigFlow flowTunnelConfig;
     readonly ITunnelConfigStorage storage;
 
-    public MainProgram(ITunnelConfigStorage storage) {
+    public MainProgram(TunnelConfigFlow flowTunnelConfig, ITunnelConfigStorage storage) {
+        this.flowTunnelConfig = flowTunnelConfig;
         this.storage = storage;
 
-        Run =
+        Create =
             from vm in Eff(() => new MainWindowViewModel())
             let afterInit =
                 from allData in storage.All
@@ -23,10 +25,10 @@ sealed class MainProgram
             select vm;
     }
 
-    public Eff<MainWindowViewModel> Run { get; }
+    public Eff<MainWindowViewModel> Create { get; }
 
     Eff<Unit> AddNewConnection(MainWindowViewModel vm) =>
-        from view in SuccessEff(new TunnelConfigViewModel())
+        from view in flowTunnelConfig.Create
         from _1 in view.Save.SubscribeEff(config => (from _1 in storage.Add(config)
                                                      from _2 in vm.CloseCurrentView
                                                      select unit

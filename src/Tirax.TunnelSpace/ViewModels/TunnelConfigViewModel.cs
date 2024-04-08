@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
 
@@ -9,16 +10,17 @@ public sealed class TunnelConfigViewModel : ViewModelBase
     string name, sshHost, remoteHost;
     short localPort, sshPort, remotePort;
 
-    public TunnelConfigViewModel() : this(NewConfig()) { }
+    [DesignOnly(true)]
+    public TunnelConfigViewModel() : this(_ => SuccessAff(NewConfig())) { }
 
-    static TunnelConfig NewConfig(Guid? id = default) =>
-        new(id ?? Guid.NewGuid(), "localhost", 22, 2222, "localhost", 22, "New Tunnel");
+    static TunnelConfig NewConfig() =>
+        new(Guid.Empty, "localhost", 22, 2222, "localhost", 22, "New Tunnel");
 
     public ReactiveCommand<Unit, TunnelConfig> Save { get; }
+    public ReactiveCommand<Unit, Unit> Back { get; } = ReactiveCommand.Create<Unit,Unit>(_ => unit);
 
-    public ReactiveCommand<RUnit,RUnit> Back { get; } = ReactiveCommand.Create(() => {});
-
-    public TunnelConfigViewModel(TunnelConfig config) {
+    internal TunnelConfigViewModel(Func<TunnelConfigViewModel, Aff<TunnelConfig>> save, Option<TunnelConfig> initial = default) {
+        var config = initial.IfNone(NewConfig);
         name = config.Name;
         sshHost = config.Host;
         remoteHost = config.RemoteHost;
@@ -26,8 +28,7 @@ public sealed class TunnelConfigViewModel : ViewModelBase
         sshPort = config.Port;
         remotePort = config.RemotePort;
 
-        var asTunnelConfig = Eff(() => new TunnelConfig(Guid.NewGuid(), sshHost, sshPort, localPort, remoteHost, remotePort, name));
-        Save = ReactiveCommand.Create<Unit, TunnelConfig>(_ => asTunnelConfig.Run().ThrowIfFail());
+        Save = ReactiveCommand.CreateFromTask<Unit, TunnelConfig>(async _ => (await save(this).Run()).ThrowIfFail());
     }
 
     public string Name {

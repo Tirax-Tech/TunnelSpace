@@ -38,6 +38,7 @@ sealed class Program
         let provider = services
                        .AddSingleton<ServiceProviderEff>()
                        .AddSingleton<MainProgram>()
+                       .AddSingleton<TunnelConfigFlow>()
                        .BuildServiceProvider()
         select provider.GetRequiredService<ServiceProviderEff>();
 }

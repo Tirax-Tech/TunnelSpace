@@ -19,7 +19,7 @@ public class App : Application
         this.sp = sp;
         Init =
             from main in sp.GetRequiredService<MainProgram>()
-            from vm in main.Run
+            from vm in main.Create
             from _ in Eff(() => {
                 if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                     desktop.MainWindow = new MainWindow {DataContext = vm};
