@@ -8,7 +8,7 @@ public static class TunnelSpaceServices
     public static Eff<IServiceCollection> Setup(IServiceCollection services) =>
         from tp in SuccessEff(TimeProviderEff.System)
         from now in tp.LocalNow
-        from logger in LogSetup.Setup(now)
+        from logger in LogSetup.Setup
         select services.AddSingleton(tp)
                        .AddSingleton(logger)
                        .AddSingleton<ITunnelConfigStorage, TunnelConfigStorage>()
