@@ -2,9 +2,9 @@
 
 namespace Tirax.TunnelSpace.Views;
 
-public partial class ConnectionSelectionView : UserControl
+public partial class LoadingScreenView : UserControl
 {
-    public ConnectionSelectionView() {
+    public LoadingScreenView() {
         InitializeComponent();
     }
 }

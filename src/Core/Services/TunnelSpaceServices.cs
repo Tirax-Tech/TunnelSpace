@@ -11,5 +11,6 @@ public static class TunnelSpaceServices
         from logger in LogSetup.Setup(now)
         select services.AddSingleton(tp)
                        .AddSingleton(logger)
-                       .AddSingleton<ITunnelConfigStorage, TunnelConfigStorage>();
+                       .AddSingleton<ITunnelConfigStorage, TunnelConfigStorage>()
+                       .AddSingleton<IUniqueId, UniqueId>();
 }

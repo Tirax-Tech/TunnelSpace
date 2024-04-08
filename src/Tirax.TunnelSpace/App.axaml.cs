@@ -4,7 +4,7 @@ using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Tirax.TunnelSpace.EffHelpers;
-using Tirax.TunnelSpace.ViewModels;
+using Tirax.TunnelSpace.Flows;
 using Tirax.TunnelSpace.Views;
 
 namespace Tirax.TunnelSpace;
@@ -17,13 +17,15 @@ public class App : Application
 
     public App(ServiceProviderEff sp) {
         this.sp = sp;
-        Init = from vm in sp.GetRequiredService<MainWindowViewModel>()
-               from _ in Eff(() => {
-                   if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                       desktop.MainWindow = new MainWindow {DataContext = vm};
-                   return unit;
-               })
-               select unit;
+        Init =
+            from main in sp.GetRequiredService<MainProgram>()
+            from vm in main.Run
+            from _ in Eff(() => {
+                if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                    desktop.MainWindow = new MainWindow {DataContext = vm};
+                return unit;
+            })
+            select unit;
     }
 
     public override void Initialize()

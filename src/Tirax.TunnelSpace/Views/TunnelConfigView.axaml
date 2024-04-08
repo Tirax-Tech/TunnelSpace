@@ -15,7 +15,10 @@
 
     <DockPanel>
         <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-            <mi:MaterialIcon Kind="ArrowLeft" Margin="24" Width="24" Height="24"/>
+            <Button Theme="{StaticResource MaterialFlatButton}"
+                    Command="{Binding Back}">
+                <mi:MaterialIcon Kind="ArrowLeft" Margin="24" Width="24" Height="24" />
+            </Button>
             <TextBlock Classes="Headline5" VerticalAlignment="Center" Width="200">New connection</TextBlock>
         </StackPanel>
         <Button CornerRadius="100" Margin="8" Width="100" Height="40" DockPanel.Dock="Bottom" Command="{Binding Save}">

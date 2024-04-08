@@ -9,7 +9,7 @@ public static class IObservableEff
         Eff(() => observable.Subscribe(x => handler(x).RunUnit()));
 
 
-    public static Eff<T> ChangeView<T>(this IReactiveObject sender, string caller, Eff<T> viewSetter) =>
+    public static Eff<T> ChangeProperty<T>(this IReactiveObject sender, string caller, Eff<T> viewSetter) =>
         from _1 in Eff(() => {
             sender.RaisePropertyChanging(caller);
             return unit;

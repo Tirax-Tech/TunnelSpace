@@ -1,42 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using ReactiveUI;
+﻿using System.Collections.Generic;
 using Tirax.TunnelSpace.EffHelpers;
-using Tirax.TunnelSpace.Services;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {
-    readonly ServiceProviderEff sp;
     readonly Stack<ViewModelBase> history = new();
 
-    public MainWindowViewModel(ServiceProviderEff sp) {
-        this.sp = sp;
+    // for designer
+    public MainWindowViewModel() : this(new LoadingScreenViewModel()) {}
 
-        CloseCurrentView = Eff(() => history.Pop());
-
-        AddNewConnection = Eff(() => {
-            var vm = CurrentViewModel;
-            var newView = new TunnelConfigViewModel();
-            history.Push(newView);
-
-            newView.Save.Subscribe(config => this.ChangeView(nameof(CurrentViewModel), CloseCurrentView).RunUnit());
-
-            this.RaiseAndSetIfChanged(ref vm, newView, nameof(CurrentViewModel));
-            return unit;
-        });
-
-        var eff =
-            from _1 in PushView(new LoadingScreenViewModel())
-            from storage in sp.GetRequiredService<ITunnelConfigStorage>()
-            from allData in storage.All
-            from initModel in SuccessEff(new ConnectionSelectionViewModel(allData))
-            from _2 in PushView(initModel)
-            from _3 in initModel.NewConnectionCommand.SubscribeEff(_ => AddNewConnection)
-            select unit;
-        Task.Run(async () => await eff.RunUnit());
+    public MainWindowViewModel(ViewModelBase initialView) {
+        CloseCurrentViewEff = Eff(history.Pop);
+        CloseCurrentView = this.ChangeProperty(nameof(CurrentViewModel), CloseCurrentViewEff);
+        history.Push(initialView);
     }
 
     public ViewModelBase CurrentViewModel {
@@ -44,19 +21,21 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => Replace(value).RunUnit();
     }
 
-    Eff<Unit> AddNewConnection { get; }
+    public Eff<ViewModelBase> PushView(ViewModelBase view) =>
+        this.ChangeProperty(nameof(CurrentViewModel), PushViewEff(view));
 
-    Eff<ViewModelBase> PushView(ViewModelBase view) =>
+    Eff<ViewModelBase> PushViewEff(ViewModelBase view) =>
         Eff(() => {
             history.Push(view);
             return view;
         });
 
-    readonly Eff<ViewModelBase> CloseCurrentView;
+    public readonly Eff<ViewModelBase> CloseCurrentView;
+    readonly Eff<ViewModelBase> CloseCurrentViewEff;
 
     Eff<ViewModelBase> Replace(ViewModelBase replacement) =>
-        this.ChangeView(nameof(CurrentViewModel),
-                        from current in CloseCurrentView
-                        from _ in PushView(replacement)
+        this.ChangeProperty(nameof(CurrentViewModel),
+                        from current in CloseCurrentViewEff
+                        from _ in PushViewEff(replacement)
                         select current);
 }
