@@ -10,4 +10,11 @@ public static class Prelude
             action();
             return unit;
         });
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Aff<Unit> aff(Func<Task> action) =>
+        Aff(async () => {
+            await action();
+            return unit;
+        });
 }

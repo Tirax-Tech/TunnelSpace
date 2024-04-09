@@ -8,8 +8,5 @@ public static class IsolatedStorageFileEff
         Eff(() => store.OpenFile(path, mode));
 
     public static Eff<Unit> CloseEff(this IsolatedStorageFileStream stream) =>
-        Eff(() => {
-            stream.Close();
-            return unit;
-        });
+        eff(stream.Close);
 }
