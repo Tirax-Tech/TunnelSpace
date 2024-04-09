@@ -1,0 +1,22 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vm="clr-namespace:Tirax.TunnelSpace.ViewModels"
+
+             x:DataType="vm:ConnectionInfoPanelViewModel"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="Tirax.TunnelSpace.Views.ConnectionInfoPanelView">
+    <UserControl.DataContext>
+        <vm:ConnectionInfoPanelViewModel />
+    </UserControl.DataContext>
+
+    <Button Classes="accent" CornerRadius="100">
+        <DockPanel Background="Blue" LastChildFill="True">
+            <mi:MaterialIcon Background="Red" HorizontalAlignment="Left" Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
+            <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
+            <TextBlock Text="{Binding Name}" />
+        </DockPanel>
+    </Button>
+</UserControl>

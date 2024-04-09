@@ -10,9 +10,12 @@
              x:DataType="vm:ConnectionSelectionViewModel"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Tirax.TunnelSpace.Views.ConnectionSelectionView">
-    <UserControl.DataContext>
+    <Design.DataContext>
         <vm:ConnectionSelectionViewModel />
-    </UserControl.DataContext>
+    </Design.DataContext>
+    <UserControl.Resources>
+        <vm:TunnelConfigToConnectionInfoPanel x:Key="tunnelConverter" />
+    </UserControl.Resources>
 
     <DockPanel>
         <TextBox UseFloatingWatermark="True" Classes="dense" Theme="{StaticResource FilledTextBox}"
@@ -29,13 +32,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Classes="accent" CornerRadius="100" Width="200" Height="60">
-                            <DockPanel LastChildFill="True" Width="200">
-                                <mi:MaterialIcon Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
-                                <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
-                                <TextBlock Text="{Binding Name}" />
-                            </DockPanel>
-                        </Button>
+                        <ContentControl Content="{Binding Converter={StaticResource tunnelConverter}}" />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
                 <ItemsControl.Styles>
