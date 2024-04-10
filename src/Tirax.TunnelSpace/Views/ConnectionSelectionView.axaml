@@ -6,6 +6,7 @@
              xmlns:mi="using:Material.Icons.Avalonia"
              xmlns:controls="using:Material.Styles.Controls"
              xmlns:vm="using:Tirax.TunnelSpace.ViewModels"
+             xmlns:v="clr-namespace:Tirax.TunnelSpace.Views"
 
              x:DataType="vm:ConnectionSelectionViewModel"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
@@ -47,4 +48,12 @@
             </controls:FloatingButton>
         </Canvas>
     </DockPanel>
+
+    <UserControl.Styles>
+        <Style Selector="v|ConnectionInfoPanelView">
+            <Setter Property="Width" Value="288" />
+            <Setter Property="Height" Value="96" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+        </Style>
+    </UserControl.Styles>
 </UserControl>

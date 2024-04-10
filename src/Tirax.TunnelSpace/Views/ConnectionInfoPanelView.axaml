@@ -6,17 +6,65 @@
              xmlns:vm="clr-namespace:Tirax.TunnelSpace.ViewModels"
 
              x:DataType="vm:ConnectionInfoPanelViewModel"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="288" d:DesignHeight="96"
              x:Class="Tirax.TunnelSpace.Views.ConnectionInfoPanelView">
-    <UserControl.DataContext>
+    <Design.DataContext>
         <vm:ConnectionInfoPanelViewModel />
-    </UserControl.DataContext>
+    </Design.DataContext>
 
-    <Button Classes="accent" CornerRadius="100">
-        <DockPanel Background="Blue" LastChildFill="True">
-            <mi:MaterialIcon Background="Red" HorizontalAlignment="Left" Margin="8,0" Kind="CableData" DockPanel.Dock="Left" />
-            <mi:MaterialIcon Kind="NavigateNext" DockPanel.Dock="Right" />
-            <TextBlock Text="{Binding Name}" />
+    <Border BorderThickness="2" BorderBrush="{DynamicResource MaterialSecondaryLightForegroundBrush}" Background="{DynamicResource MaterialCardBrush}"
+            CornerRadius="12" ClipToBounds="True">
+        <DockPanel LastChildFill="True">
+            <StackPanel Name="ActionPanel" DockPanel.Dock="Bottom">
+                <Button ToolTip.Tip="Edit settings" Theme="{StaticResource MaterialFlatButton}" Classes="no-padding">
+                    <mi:MaterialIcon Kind="Settings" />
+                </Button>
+                <ToggleButton Theme="{StaticResource MaterialFlatButton}" Classes="no-padding">
+                    <Panel>
+                        <mi:MaterialIcon Kind="Play" Classes="play" />
+                        <mi:MaterialIcon Kind="Stop" Classes="stop" />
+                    </Panel>
+                </ToggleButton>
+            </StackPanel>
+            <mi:MaterialIcon VerticalAlignment="Top" Kind="CableData" DockPanel.Dock="Left" />
+            <TextBlock Classes="Body1" Text="{Binding Name}" Margin="0,12,0,0" />
         </DockPanel>
-    </Button>
+    </Border>
+
+    <UserControl.Styles>
+        <Style Selector="mi|MaterialIcon">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Margin" Value="12" />
+        </Style>
+        <Style Selector="ToggleButton mi|MaterialIcon.play">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="ToggleButton mi|MaterialIcon.stop">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="ToggleButton:checked mi|MaterialIcon.play">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="ToggleButton:checked mi|MaterialIcon.stop">
+            <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="ToggleButton:checked">
+            <Setter Property="IsVisible" Value="True" />
+            <Setter Property="Foreground" Value="{DynamicResource MaterialSecondaryMidBrush}" />
+        </Style>
+
+        <Style Selector="StackPanel#ActionPanel">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Orientation" Value="Horizontal" />
+            <Setter Property="Height" Value="48" />
+        </Style>
+        <Style Selector="StackPanel#ActionPanel > :is(Button)">
+            <Setter Property="Foreground" Value="{DynamicResource MaterialBodyBrush}" />
+        </Style>
+        <Style Selector=":is(Button).no-padding">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+    </UserControl.Styles>
 </UserControl>

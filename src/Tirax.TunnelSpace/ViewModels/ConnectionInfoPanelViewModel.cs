@@ -9,8 +9,6 @@ namespace Tirax.TunnelSpace.ViewModels;
 
 public sealed class TunnelConfigToConnectionInfoPanel : IValueConverter
 {
-    public static TunnelConfigToConnectionInfoPanel Instance { get; } = new();
-
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         value is TunnelConfig tunnelConfig ? new ConnectionInfoPanelViewModel(tunnelConfig) : null;
 
