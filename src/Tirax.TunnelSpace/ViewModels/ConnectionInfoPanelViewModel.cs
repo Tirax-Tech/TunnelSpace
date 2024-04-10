@@ -1,34 +1,28 @@
 ﻿using System;
 using System.ComponentModel;
-using System.Globalization;
-using Avalonia.Data.Converters;
 using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
+using Tirax.TunnelSpace.Flows;
 
 namespace Tirax.TunnelSpace.ViewModels;
-
-public sealed class TunnelConfigToConnectionInfoPanel : IValueConverter
-{
-    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is TunnelConfig tunnelConfig ? new ConnectionInfoPanelViewModel(tunnelConfig) : null;
-
-    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is ConnectionInfoPanelViewModel viewModel ? viewModel.Model : null;
-}
 
 public sealed class ConnectionInfoPanelViewModel : ViewModelBase
 {
     TunnelConfig tunnelConfig;
 
+    bool isPlaying;
     string name = "(Sample name)";
 
     [DesignOnly(true)]
-    public ConnectionInfoPanelViewModel() : this(new(Guid.Empty, "(Sample Host)", 9999, 8888, "(Sample Remote Host)", 7777, "(Sample Name)")) { }
+    public ConnectionInfoPanelViewModel() : this(AppCommands.EditDummy, TunnelConfig.CreateSample(Guid.Empty)) { }
 
-    public ConnectionInfoPanelViewModel(TunnelConfig tunnelConfig)
+    public ConnectionInfoPanelViewModel(ReactiveCommand<TunnelConfig,TunnelConfig> editCommand, TunnelConfig tunnelConfig)
     {
+        Edit = editCommand;
         this.tunnelConfig = tunnelConfig;
         Name = tunnelConfig.Name;
+
+        PlayOrStop = ReactiveCommand.Create<Unit,bool>(_ => IsPlaying = !IsPlaying);
     }
 
     public string Name {
@@ -40,4 +34,15 @@ public sealed class ConnectionInfoPanelViewModel : ViewModelBase
         get => tunnelConfig;
         set => this.RaiseAndSetIfChanged(ref tunnelConfig, value);
     }
+
+    public bool IsPlaying
+    {
+        get => isPlaying;
+        set => this.RaiseAndSetIfChanged(ref isPlaying, value);
+    }
+
+    public TunnelConfig Config => tunnelConfig;
+
+    public ReactiveCommand<Unit,bool> PlayOrStop { get; }
+    public ReactiveCommand<TunnelConfig, TunnelConfig> Edit { get; }
 }

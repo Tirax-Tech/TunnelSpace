@@ -13,6 +13,8 @@ public interface ITunnelConfigStorage
 {
     Aff<Seq<TunnelConfig>> All { get; }
     Aff<TunnelConfig> Add(TunnelConfig config);
+    Aff<TunnelConfig> Update(TunnelConfig config);
+    Aff<Option<TunnelConfig>> Delete(Guid configId);
 
     IObservable<Change<TunnelConfig>> Changes { get; }
 }
@@ -29,6 +31,7 @@ public class TunnelConfigStorage : ITunnelConfigStorage
     public TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) {
         this.logger = logger;
         this.uniqueId = uniqueId;
+
         All = Eff(() => inMemoryStorage.Values.ToSeq());
 
         var init =
@@ -52,12 +55,30 @@ public class TunnelConfigStorage : ITunnelConfigStorage
     public Aff<Seq<TunnelConfig>> All { get; }
 
     public Aff<TunnelConfig> Add(TunnelConfig config) =>
-        from _1 in eff(() => {
+        ChangeState(Eff(() =>
+        {
             inMemoryStorage[config.Id] = config;
             changes.OnNext(Change<TunnelConfig>.Added(config));
-        })
-        from _2 in use(GetStore, Save).IfFailAff(e => logger.ErrorEff(e, "Failed to save data"))
-        select config;
+            return config;
+        }));
+
+    public Aff<TunnelConfig> Update(TunnelConfig config)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Aff<Option<TunnelConfig>> Delete(Guid configId) =>
+        ChangeState(Eff(() =>
+        {
+            var existed = inMemoryStorage.Remove(configId, out var v) ? Some(v) : None;
+            existed.Iter(item => changes.OnNext(Change<TunnelConfig>.Removed(item)));
+            return existed;
+        }));
+
+    Aff<T> ChangeState<T>(Eff<T> action) =>
+        from result in action
+        from _ in use(GetStore, Save).IfFailAff(e => logger.ErrorEff(e, "Failed to save data"))
+        select result;
 
     static Eff<Seq<TunnelConfig>> TryDeserialize(string data) =>
         Eff(() => JsonSerializer.Deserialize<TunnelConfig[]>(data).ToSeq());

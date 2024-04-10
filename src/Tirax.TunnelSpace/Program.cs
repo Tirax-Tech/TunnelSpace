@@ -39,7 +39,6 @@ sealed class Program
                        .AddSingleton<ServiceProviderEff>()
                        .AddSingleton<MainProgram>()
                        .AddSingleton<ConnectionSelectionFlow>()
-                       .AddSingleton<TunnelConfigFlow>()
                        .BuildServiceProvider()
         select provider.GetRequiredService<ServiceProviderEff>();
 }

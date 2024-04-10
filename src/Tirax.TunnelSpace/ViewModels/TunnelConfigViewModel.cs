@@ -7,57 +7,81 @@ namespace Tirax.TunnelSpace.ViewModels;
 
 public sealed class TunnelConfigViewModel : ViewModelBase
 {
-    string name, sshHost, remoteHost;
-    short localPort, sshPort, remotePort;
-
     [DesignOnly(true)]
-    public TunnelConfigViewModel() : this(_ => SuccessAff(NewConfig())) { }
+    public TunnelConfigViewModel() : this(default) { }
 
-    static TunnelConfig NewConfig() =>
-        new(Guid.Empty, "localhost", 22, 2222, "localhost", 22, "New Tunnel");
+    public static TunnelConfigViewModel CreateSample() => new(NewConfig(Guid.NewGuid()));
 
+    static TunnelConfig NewConfig(Guid id) =>
+        new(id, "localhost", 22, 2222, "localhost", 22, "New Tunnel");
+
+    public ReactiveCommand<Unit, TunnelConfig> Delete { get; }
     public ReactiveCommand<Unit, TunnelConfig> Save { get; }
     public ReactiveCommand<Unit, Unit> Back { get; } = ReactiveCommand.Create<Unit,Unit>(_ => unit);
 
-    internal TunnelConfigViewModel(Func<TunnelConfigViewModel, Aff<TunnelConfig>> save, Option<TunnelConfig> initial = default) {
-        var config = initial.IfNone(NewConfig);
-        name = config.Name;
-        sshHost = config.Host;
-        remoteHost = config.RemoteHost;
-        localPort = config.LocalPort;
-        sshPort = config.Port;
-        remotePort = config.RemotePort;
+    internal TunnelConfigViewModel(Option<TunnelConfig> initial = default) {
+        Config = initial.IfNone(() => NewConfig(Guid.Empty));
 
-        Save = ReactiveCommand.CreateFromTask<Unit, TunnelConfig>(async _ => (await save(this).Run()).ThrowIfFail());
+        Save = ReactiveCommand.Create<Unit, TunnelConfig>(_ => Config);
+        Delete = ReactiveCommand.Create<Unit, TunnelConfig>(_ => Config);
     }
 
+    public TunnelConfig Config { get; private set; }
+
     public string Name {
-        get => name;
-        set => this.RaiseAndSetIfChanged(ref name, value);
+        get => Config.Name;
+        set {
+            this.RaisePropertyChanging();
+            Config = Config with { Name = value };
+            this.RaisePropertyChanged();
+        }
     }
 
     public short LocalPort {
-        get => localPort;
-        set => this.RaiseAndSetIfChanged(ref localPort, value);
+        get => Config.LocalPort;
+        set {
+            this.RaisePropertyChanging();
+            Config = Config with { LocalPort = value };
+            this.RaisePropertyChanged();
+        }
     }
 
     public string SshHost {
-        get => sshHost;
-        set => this.RaiseAndSetIfChanged(ref sshHost, value);
+        get => Config.Host;
+        set {
+            this.RaisePropertyChanging();
+            Config = Config with { Host = value };
+            this.RaisePropertyChanged();
+        }
     }
 
     public short SshPort {
-        get => sshPort;
-        set => this.RaiseAndSetIfChanged(ref sshPort, value);
+        get => Config.Port;
+        set {
+            this.RaisePropertyChanging();
+            Config = Config with { Port = value };
+            this.RaisePropertyChanged();
+        }
     }
 
     public string RemoteHost {
-        get => remoteHost;
-        set => this.RaiseAndSetIfChanged(ref remoteHost, value);
+        get => Config.RemoteHost;
+        set {
+            this.RaisePropertyChanging();
+            Config = Config with { RemoteHost = value };
+            this.RaisePropertyChanged();
+        }
     }
 
     public short RemotePort {
-        get => remotePort;
-        set => this.RaiseAndSetIfChanged(ref remotePort, value);
+        get => Config.RemotePort;
+        set {
+            this.RaisePropertyChanging();
+            Config = Config with { RemotePort = value };
+            this.RaisePropertyChanged();
+        }
     }
+
+    public bool IsNew => Config.Id == Guid.Empty;
+    public string Title => IsNew ? "New Connection" : "Edit Connection";
 }

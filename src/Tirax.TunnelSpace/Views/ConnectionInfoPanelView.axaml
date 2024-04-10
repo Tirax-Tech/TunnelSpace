@@ -16,7 +16,8 @@
             CornerRadius="12" ClipToBounds="True">
         <DockPanel LastChildFill="True">
             <StackPanel Name="ActionPanel" DockPanel.Dock="Bottom">
-                <Button ToolTip.Tip="Edit settings" Theme="{StaticResource MaterialFlatButton}" Classes="no-padding">
+                <Button ToolTip.Tip="Edit settings" Theme="{StaticResource MaterialFlatButton}" Classes="no-padding"
+                        Command="{Binding Edit}" CommandParameter="{Binding Config}">
                     <mi:MaterialIcon Kind="Settings" />
                 </Button>
                 <ToggleButton Theme="{StaticResource MaterialFlatButton}" Classes="no-padding">

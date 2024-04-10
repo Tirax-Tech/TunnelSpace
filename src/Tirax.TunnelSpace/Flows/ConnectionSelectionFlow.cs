@@ -9,12 +9,24 @@ public sealed class ConnectionSelectionFlow(ITunnelConfigStorage storage)
 {
     public Aff<ConnectionSelectionViewModel> Create =>
         from allData in storage.All
-        let vm = new ConnectionSelectionViewModel(allData)
+        let editCommand = AppCommands.CreateEdit()
+        let configVms = allData.Map(config => new ConnectionInfoPanelViewModel(editCommand, config)).ToSeq()
+        let vm = new ConnectionSelectionViewModel(editCommand, configVms)
         from _1 in storage.Changes.SubscribeEff(change => change switch
         {
-            EntryAdded<TunnelConfig> add => vm.TunnelConfigs.AddEff(add.Value),
-            EntryMapped<TunnelConfig, TunnelConfig> update => vm.TunnelConfigs.ReplaceEff(update.From, update.To).Ignore(),
-            EntryRemoved<TunnelConfig> delete => vm.TunnelConfigs.RemoveEff(delete.OldValue).Ignore(),
+            EntryAdded<TunnelConfig> add =>
+                from configVM in SuccessEff(new ConnectionInfoPanelViewModel(editCommand, add.Value))
+                from _ in vm.TunnelConfigs.AddEff(configVM)
+                select unit,
+
+            EntryMapped<TunnelConfig, TunnelConfig> update =>
+                from configVM in SuccessEff(new ConnectionInfoPanelViewModel(editCommand, update.To))
+                from _ in vm.TunnelConfigs.ReplaceEff(item => item.Config.Id == update.From.Id, configVM)
+                select unit,
+
+            EntryRemoved<TunnelConfig> delete =>
+                vm.TunnelConfigs.RemoveEff(item => item.Config.Id == delete.OldValue.Id).Ignore(),
+
             _ => unitEff
         })
         select vm;

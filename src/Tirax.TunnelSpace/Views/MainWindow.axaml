@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 
-        mc:Ignorable="d" Width="890" Height="450"
+        mc:Ignorable="d" Width="890" Height="460"
         x:Class="Tirax.TunnelSpace.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"

@@ -1,18 +1,27 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
+using Tirax.TunnelSpace.Flows;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public sealed class ConnectionSelectionViewModel(Seq<TunnelConfig> init) : ViewModelBase
+public sealed class ConnectionSelectionViewModel(ReactiveCommand<TunnelConfig,TunnelConfig> editCommand,
+    Seq<ConnectionInfoPanelViewModel> init) : ViewModelBase
 {
     [DesignOnly(true)]
-    public ConnectionSelectionViewModel() : this(Seq(TunnelConfig.Sample,
-                                                     TunnelConfig.Sample,
-                                                     TunnelConfig.Sample)) { }
+    public ConnectionSelectionViewModel() : this(
+        AppCommands.EditDummy,
+        Seq<ConnectionInfoPanelViewModel>(
+        new(AppCommands.EditDummy,TunnelConfig.CreateSample(Guid.NewGuid())),
+        new(AppCommands.EditDummy,TunnelConfig.CreateSample(Guid.NewGuid())),
+        new(AppCommands.EditDummy,TunnelConfig.CreateSample(Guid.NewGuid()))))
+    { }
 
-    public ObservableCollection<TunnelConfig> TunnelConfigs { get; } = new(init);
+    public ObservableCollection<ConnectionInfoPanelViewModel> TunnelConfigs { get; } = new(init);
 
-    public ReactiveCommand<RUnit, RUnit> NewConnectionCommand { get; } = ReactiveCommand.Create(() => { });
+    public ReactiveCommand<Unit, Unit> NewConnectionCommand { get; } = ReactiveCommand.Create<Unit,Unit>(_ => unit);
+
+    public ReactiveCommand<TunnelConfig, TunnelConfig> Edit { get; } = editCommand;
 }

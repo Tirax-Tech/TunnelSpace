@@ -14,9 +14,6 @@
     <Design.DataContext>
         <vm:ConnectionSelectionViewModel />
     </Design.DataContext>
-    <UserControl.Resources>
-        <vm:TunnelConfigToConnectionInfoPanel x:Key="tunnelConverter" />
-    </UserControl.Resources>
 
     <DockPanel>
         <TextBox UseFloatingWatermark="True" Classes="dense" Theme="{StaticResource FilledTextBox}"
@@ -33,7 +30,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <ContentControl Content="{Binding Converter={StaticResource tunnelConverter}}" />
+                        <ContentControl Content="{Binding}" />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
                 <ItemsControl.Styles>

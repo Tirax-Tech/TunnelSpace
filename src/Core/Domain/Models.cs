@@ -9,5 +9,5 @@ public sealed record TunnelConfig(
     short RemotePort,
     string Name)
 {
-    public static readonly TunnelConfig Sample = new(Guid.Empty, "localhost", 22, 8080, "localhost", 80, "Sample");
+    public static TunnelConfig CreateSample(Guid id) => new(id, "localhost", 22, 8080, "localhost", 80, "Sample");
 }

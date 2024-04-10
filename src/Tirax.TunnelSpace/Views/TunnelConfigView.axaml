@@ -7,7 +7,7 @@
              xmlns:vm="using:Tirax.TunnelSpace.ViewModels"
 
              x:DataType="vm:TunnelConfigViewModel"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="470"
              x:Class="Tirax.TunnelSpace.Views.TunnelConfigView">
     <UserControl.DataContext>
         <vm:TunnelConfigViewModel/>
@@ -19,14 +19,19 @@
                     Command="{Binding Back}">
                 <mi:MaterialIcon Kind="ArrowLeft" Margin="24" Width="24" Height="24" />
             </Button>
-            <TextBlock Classes="Headline5" VerticalAlignment="Center" Width="200">New connection</TextBlock>
+            <TextBlock Text="{Binding Title}" Classes="Headline5" VerticalAlignment="Center" Width="200" />
         </StackPanel>
-        <Button CornerRadius="100" Margin="8" Width="100" Height="40" DockPanel.Dock="Bottom" Command="{Binding Save}">
-            <StackPanel Orientation="Horizontal">
-                <mi:MaterialIcon Kind="Upload" />
-                <TextBlock>Save</TextBlock>
-            </StackPanel>
-        </Button>
+        <StackPanel Name="ActionPanel" HorizontalAlignment="Center" Orientation="Horizontal" DockPanel.Dock="Bottom">
+            <lc:MudButton IsVisible="{Binding !IsNew}" Command="{Binding Delete}">
+                Delete
+            </lc:MudButton>
+            <Button Command="{Binding Save}">
+                <StackPanel Orientation="Horizontal">
+                    <mi:MaterialIcon Kind="Upload" />
+                    <TextBlock>Save</TextBlock>
+                </StackPanel>
+            </Button>
+        </StackPanel>
         <Grid ColumnDefinitions="*,*"
               RowDefinitions="Auto,Auto,Auto,Auto">
             <lc:MudTextField Grid.Row="0" Grid.Column="0" Label="Name" Text="{Binding Name}" />
@@ -46,6 +51,12 @@
     <UserControl.Styles>
         <Style Selector="Grid > TextBox">
             <Setter Property="Margin" Value="8" />
+        </Style>
+        <Style Selector="StackPanel#ActionPanel > Button">
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Width" Value="144" />
+            <Setter Property="Margin" Value="12" />
+            <Setter Property="CornerRadius" Value="96" />
         </Style>
     </UserControl.Styles>
 </UserControl>
