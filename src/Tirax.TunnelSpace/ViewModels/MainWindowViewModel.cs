@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Avalonia.Controls;
+using ReactiveUI;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Views;
 
@@ -17,11 +18,17 @@ public interface IAppMainWindow
 public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 {
     readonly Stack<ViewModelBase> history = new();
+    string title = "Tirax Tunnel Space";
 
     public MainWindowViewModel() {
         closeCurrentViewEff = Eff(history.Pop);
         CloseCurrentView = this.ChangeProperty(nameof(CurrentViewModel), closeCurrentViewEff);
         history.Push(new LoadingScreenViewModel());
+    }
+
+    public string Title {
+        get => title;
+        set => this.RaiseAndSetIfChanged(ref title, value);
     }
 
     public ViewModelBase CurrentViewModel {
