@@ -1,0 +1,5 @@
+﻿akka.actor.deployment {
+  /ssh-manager {
+    dispatcher = akka.actor.synchronized-dispatcher
+  }
+}
