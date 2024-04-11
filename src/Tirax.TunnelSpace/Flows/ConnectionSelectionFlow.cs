@@ -47,7 +47,11 @@ public sealed class ConnectionSelectionFlow(IAppMainWindow mainWindow, ITunnelCo
         from view in SuccessEff(new TunnelConfigViewModel(config ?? TunnelConfig.CreateSample(Guid.Empty)))
         from _1 in view.Save.SubscribeEff(c => Update(config is null, c).ToBackground())
         from _2 in view.Back.SubscribeEff(_ => mainWindow.CloseCurrentView.Ignore())
-        from _3 in mainWindow.PushView(view)
+        from _3 in view.Delete.SubscribeEff(_ => (from _1 in storage.Delete(view.Config.Id)
+                                                  from _2 in mainWindow.CloseCurrentView
+                                                  select unit
+                                                 ).ToBackground())
+        from _4 in mainWindow.PushView(view)
         select unit;
 
     Aff<Unit> Update(bool isNew, TunnelConfig config) =>
