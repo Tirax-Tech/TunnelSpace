@@ -7,7 +7,8 @@ using Tirax.TunnelSpace.Flows;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public sealed class ConnectionSelectionViewModel(ReactiveCommand<TunnelConfig,TunnelConfig> editCommand,
+public sealed class ConnectionSelectionViewModel(
+    ReactiveCommand<TunnelConfig,TunnelConfig> editCommand,
     Seq<ConnectionInfoPanelViewModel> init) : ViewModelBase
 {
     [DesignOnly(true)]

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Flows;
 using Tirax.TunnelSpace.Services;
+using Tirax.TunnelSpace.ViewModels;
 
 namespace Tirax.TunnelSpace;
 
@@ -27,7 +28,7 @@ sealed class Program
         select app;
 
     static Eff<AppBuilder> BuildApp(ServiceProviderEff container) =>
-        Eff(() => AppBuilder.Configure(() => new App(container))
+        Eff(() => AppBuilder.Configure(() => container.GetRequiredService<App>().Run().ThrowIfFail())
                             .UsePlatformDetect()
                             .WithInterFont()
                             .LogToTrace()
@@ -35,10 +36,11 @@ sealed class Program
 
     static readonly Eff<ServiceProviderEff> Container =
         from services in TunnelSpaceServices.Setup(new ServiceCollection())
-        let provider = services
-                       .AddSingleton<ServiceProviderEff>()
-                       .AddSingleton<MainProgram>()
-                       .AddSingleton<ConnectionSelectionFlow>()
-                       .BuildServiceProvider()
+        let provider = services.AddSingleton<App>()
+                               .AddSingleton<IAppMainWindow, MainWindowViewModel>()
+                               .AddSingleton<ServiceProviderEff>()
+                               .AddSingleton<IMainProgram, MainProgram>()
+                               .AddSingleton<IConnectionSelectionFlow, ConnectionSelectionFlow>()
+                               .BuildServiceProvider()
         select provider.GetRequiredService<ServiceProviderEff>();
 }

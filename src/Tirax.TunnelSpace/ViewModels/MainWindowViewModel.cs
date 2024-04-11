@@ -1,19 +1,27 @@
 ﻿using System.Collections.Generic;
+using Avalonia.Controls;
 using Tirax.TunnelSpace.EffHelpers;
+using Tirax.TunnelSpace.Views;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public sealed class MainWindowViewModel : ViewModelBase
+public interface IAppMainWindow
+{
+    Eff<Window> CreateView { get; }
+
+    Eff<ViewModelBase> CloseCurrentView { get; }
+    Eff<ViewModelBase> PushView(ViewModelBase replacement);
+    Eff<ViewModelBase> Replace(ViewModelBase replacement);
+}
+
+public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 {
     readonly Stack<ViewModelBase> history = new();
 
-    // for designer
-    public MainWindowViewModel() : this(new LoadingScreenViewModel()) {}
-
-    public MainWindowViewModel(ViewModelBase initialView) {
-        CloseCurrentViewEff = Eff(history.Pop);
-        CloseCurrentView = this.ChangeProperty(nameof(CurrentViewModel), CloseCurrentViewEff);
-        history.Push(initialView);
+    public MainWindowViewModel() {
+        closeCurrentViewEff = Eff(history.Pop);
+        CloseCurrentView = this.ChangeProperty(nameof(CurrentViewModel), closeCurrentViewEff);
+        history.Push(new LoadingScreenViewModel());
     }
 
     public ViewModelBase CurrentViewModel {
@@ -30,12 +38,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             return view;
         });
 
-    public readonly Eff<ViewModelBase> CloseCurrentView;
-    readonly Eff<ViewModelBase> CloseCurrentViewEff;
+    public Eff<Window> CreateView => Eff(() => (Window) new MainWindow { DataContext = this });
 
-    Eff<ViewModelBase> Replace(ViewModelBase replacement) =>
+    public Eff<ViewModelBase> CloseCurrentView { get; }
+    readonly Eff<ViewModelBase> closeCurrentViewEff;
+
+    public Eff<ViewModelBase> Replace(ViewModelBase replacement) =>
         this.ChangeProperty(nameof(CurrentViewModel),
-                        from current in CloseCurrentViewEff
+                        from current in closeCurrentViewEff
                         from _ in PushViewEff(replacement)
                         select current);
 }
