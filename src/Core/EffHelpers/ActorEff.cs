@@ -20,7 +20,7 @@ public static class ActorEff
         Eff(() => ActorSystem.Create(name, config));
 
     public static Eff<Unit> TellEff(this ICanTell target, object message, Option<IActorRef> sender = default) =>
-        eff(() => target.Tell(message, sender.IfNone(ActorRefs.NoSender)));
+        eff(() => target.Tell(message, sender.ToNullable()));
 
     public static Eff<Unit> Respond<T>(this ICanTell target, Eff<T> message,
                                           Option<Func<Error, Exception>> errorMapper = default,

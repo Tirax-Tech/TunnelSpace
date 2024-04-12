@@ -12,14 +12,26 @@ public interface ISshManager
     Aff<ISshController> CreateSshController(TunnelConfig config);
 }
 
-public sealed class SshManager(ActorSystem system) : ISshManager
+public sealed class SshManager(IActorRef manager) : ISshManager
 {
-    readonly Eff<IActorRef> sshManager = system.CreateActor(() => new SshManagerActor(StartSshProcess), "ssh-manager").Memo();
-
     public Aff<ISshController> CreateSshController(TunnelConfig config) =>
-        from manager in sshManager
-        from actor in manager.AskEff<ISshController>((nameof(CreateSshController), config))
-        select actor;
+        manager.AskEff<ISshController>((nameof(CreateSshController), config));
+}
+
+public sealed class SshManagerActor : UntypedActor
+{
+    protected override void OnReceive(object message) =>
+        (message switch
+         {
+             (nameof(ISshManager.CreateSshController), TunnelConfig config) =>
+                 Sender.Respond(from process in SuccessEff(StartSshProcess(config))
+                                from actor in Context.CreateActor<SshController>(() => new SshController(process),
+                                                                                 $"ssh-connection-{config.Id}")
+                                select new SshControllerWrapper(actor)),
+
+             _ => eff(() => Unhandled(message))
+         }
+        ).RunUnit();
 
     static Eff<Process> StartSshProcess(TunnelConfig config) {
         var portParameters = IsPortUnspecified(config.Port)? Seq.empty<string>() : Seq("-p ", config.Port.ToString());
@@ -30,22 +42,4 @@ public sealed class SshManager(ActorSystem system) : ISshManager
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool IsPortUnspecified(short port) => port == 0;
-}
-
-sealed class SshManagerActor(Func<TunnelConfig, Eff<Process>> startSsh) : UntypedActor
-{
-    protected override void OnReceive(object message) {
-        var run =
-            message switch
-            {
-                (nameof(ISshManager.CreateSshController), TunnelConfig config) =>
-                    Sender.Respond(from process in SuccessEff(startSsh(config))
-                                   from actor in Context.CreateActor<SshController>(() => new SshController(process),
-                                                                                         $"ssh-connection-{config.Id}")
-                                   select new SshControllerWrapper(actor)),
-
-                _ => eff(() => Unhandled(message))
-            };
-        run.RunUnit();
-    }
 }

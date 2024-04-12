@@ -17,4 +17,8 @@ public static class SeriLogEff
 
     public static Eff<Unit> ErrorEff(this ILogger logger, Error error, string message) =>
         eff(() => logger.Error(error, message));
+
+    public static Aff<Unit> LogResult<T>(this ILogger logger, Aff<T> work, Option<string> success = default, Option<Func<Error,string>> error = default) =>
+        work.MatchAff(_ => success.Match(s => logger.InformationEff(s).ToAff(), unitAff),
+                      e => logger.ErrorEff(e, error.Map(f => f(e)).IfNone("Error in LogResult!")));
 }

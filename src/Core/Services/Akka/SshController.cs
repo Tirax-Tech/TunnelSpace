@@ -21,7 +21,7 @@ sealed class SshControllerWrapper(IActorRef actor) : ISshController
 
 public sealed class SshController(Eff<Process> startSsh) : UntypedActor
 {
-    Subject<bool> state = new();
+    BehaviorSubject<bool> state = new(false);
     Option<Process> process;
 
     protected override void OnReceive(object message) =>
@@ -38,6 +38,8 @@ public sealed class SshController(Eff<Process> startSsh) : UntypedActor
                  from _2 in eff(() => Self.Tell(PoisonPill.Instance))
                  select unit,
 
+             "CheckProcess" => eff(() => process.Iter(p => p.Refresh())),
+
              _ => unitEff
          }
         ).RunUnit();
@@ -46,6 +48,8 @@ public sealed class SshController(Eff<Process> startSsh) : UntypedActor
         eff(() => {
                 process = p;
                 state.OnNext(true);
+                p.EnableRaisingEvents = true;
+                p.Exited += (_, _) => CloseCurrentProcess().RunUnit();
             });
 
     Eff<Unit> CloseCurrentProcess() =>
@@ -53,7 +57,7 @@ public sealed class SshController(Eff<Process> startSsh) : UntypedActor
                 if (process.IfSome(out var p)) {
                     state.OnNext(false);
                     state.OnCompleted();
-                    state = new();
+                    state = new(false);
                     process = None;
 
                     using var _ = p;

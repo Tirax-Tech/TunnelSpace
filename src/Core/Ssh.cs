@@ -28,7 +28,7 @@ public static class Ssh
         from isRunning in GetRunningSshAgents()
         from message in isRunning ? SuccessEff("Agent is already running")
                             : StartProcess(SshAgentProcessName).Map(_ => "Agent started")
-        from _ in LoggerEff.Call(logger).Information("Agent running state: {State}", message)
+        from _ in logger.InformationEff("Agent running state: {State}", message)
         select unit;
 
     public static Eff<Unit> Initialize(ILogger logger) =>

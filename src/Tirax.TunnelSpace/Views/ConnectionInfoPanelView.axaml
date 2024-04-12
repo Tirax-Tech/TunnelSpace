@@ -20,7 +20,8 @@
                         Command="{Binding Edit}" CommandParameter="{Binding Config}">
                     <mi:MaterialIcon Kind="Settings" />
                 </Button>
-                <ToggleButton Theme="{StaticResource MaterialFlatButton}" Classes="no-padding">
+                <ToggleButton IsChecked="{Binding IsPlaying, Mode=OneWay}" Theme="{StaticResource MaterialFlatButton}" Classes="no-padding"
+                              Command="{Binding PlayOrStop}">
                     <Panel>
                         <mi:MaterialIcon Kind="Play" Classes="play" />
                         <mi:MaterialIcon Kind="Stop" Classes="stop" />

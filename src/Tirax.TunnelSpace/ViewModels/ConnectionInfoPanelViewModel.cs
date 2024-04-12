@@ -1,48 +1,54 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Reactive.Linq;
 using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
 using Tirax.TunnelSpace.Flows;
+using Tirax.TunnelSpace.Services.Akka;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public sealed class ConnectionInfoPanelViewModel : ViewModelBase
+public class ConnectionInfoPanelViewModel : ViewModelBase, IDisposable
 {
-    TunnelConfig tunnelConfig;
-
-    bool isPlaying;
     string name = "(Sample name)";
+    ObservableAsPropertyHelper<bool> isPlaying;
 
     [DesignOnly(true)]
-    public ConnectionInfoPanelViewModel() : this(AppCommands.EditDummy, TunnelConfig.CreateSample(Guid.Empty)) { }
+    public ConnectionInfoPanelViewModel() : this(TunnelConfig.CreateSample(Guid.Empty)) { }
 
-    public ConnectionInfoPanelViewModel(ReactiveCommand<TunnelConfig,TunnelConfig> editCommand, TunnelConfig tunnelConfig)
+    public ConnectionInfoPanelViewModel(TunnelConfig tunnelConfig)
     {
-        Edit = editCommand;
-        this.tunnelConfig = tunnelConfig;
+        Config = tunnelConfig;
         Name = tunnelConfig.Name;
 
-        PlayOrStop = ReactiveCommand.Create<Unit,bool>(_ => IsPlaying = !IsPlaying);
+        isPlaying = Observable.Empty<bool>().ToProperty(this, x => x.IsPlaying);
+
+        PlayOrStop = ReactiveCommand.Create<Unit,bool>(_ => IsPlaying);
     }
+
+    public Option<ISshController> Controller { get; private set; }
 
     public string Name {
         get => name;
         set => this.RaiseAndSetIfChanged(ref name, value);
     }
 
-    public TunnelConfig Model {
-        get => tunnelConfig;
-        set => this.RaiseAndSetIfChanged(ref tunnelConfig, value);
-    }
+    public bool IsPlaying => isPlaying.Value;
 
-    public bool IsPlaying
-    {
-        get => isPlaying;
-        set => this.RaiseAndSetIfChanged(ref isPlaying, value);
-    }
-
-    public TunnelConfig Config => tunnelConfig;
+    public TunnelConfig Config { get; }
 
     public ReactiveCommand<Unit,bool> PlayOrStop { get; }
-    public ReactiveCommand<TunnelConfig, TunnelConfig> Edit { get; }
+    public ReactiveCommand<TunnelConfig, TunnelConfig> Edit { get; } = AppCommands.CreateEdit();
+
+    public Unit Play(ISshController controller, IObservable<bool> state) {
+        this.RaisePropertyChanging(nameof(IsPlaying));
+        Controller = Some(controller);
+        isPlaying = state.ToProperty(this, x => x.IsPlaying);
+        this.RaisePropertyChanged(nameof(IsPlaying));
+        return unit;
+    }
+
+    public void Dispose() {
+        Controller.Iter(c => c.Dispose());
+    }
 }
