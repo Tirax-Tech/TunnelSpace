@@ -6,7 +6,9 @@ namespace Tirax.TunnelSpace.Flows;
 
 static class AppCommands
 {
-    public static ReactiveCommand<TunnelConfig, TunnelConfig> CreateEdit() => ReactiveCommand.Create<TunnelConfig, TunnelConfig>(identity);
+    public static ReactiveCommand<TunnelConfig, TunnelConfig> CreateEdit() =>
+        ReactiveCommand.Create<TunnelConfig, TunnelConfig>(identity);
+
     public static readonly ReactiveCommand<TunnelConfig, TunnelConfig> EditDummy = CreateEdit();
 }
 
