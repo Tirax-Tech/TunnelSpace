@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -9,6 +10,9 @@ namespace Tirax.TunnelSpace;
 
 public class App(Func<IAppMainWindow, Eff<Unit>> init) : Application
 {
+    [DesignOnly(true)]
+    public App() : this(_ => unitEff) {}
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);

@@ -18,9 +18,13 @@ sealed class Program
                                    .AddSingleton<IMainProgram, MainProgram>()
                                    .AddSingleton<IConnectionSelectionFlow, ConnectionSelectionFlow>()
                                    .BuildServiceProvider()
-            from main in provider.GetRequiredServiceEff<IMainProgram>()
-            from vm in main.Start
-            from __ in mainVm.PushView(vm)
+            let start =
+                from main in provider.GetRequiredServiceEff<IMainProgram>()
+                from vm in main.Start
+                from __ in mainVm.PushView(vm)
+                select unit
+            from _ in start.MatchAff(_ => unitAff,
+                                     e => mainVm.PushView(new LoadingScreenViewModel(e.ToString())).Ignore())
             select unit
         ).ToBackground();
 
