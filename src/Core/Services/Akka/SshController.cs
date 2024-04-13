@@ -24,6 +24,10 @@ public sealed class SshController(Eff<Process> startSsh) : UntypedActor
     BehaviorSubject<bool> state = new(false);
     Option<Process> process;
 
+    protected override void PostStop() {
+        CloseCurrentProcess().RunUnit();
+    }
+
     protected override void OnReceive(object message) =>
         (message switch
          {

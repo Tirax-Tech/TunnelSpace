@@ -19,8 +19,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 
     static readonly string AppVersion =
         Assembly.GetEntryAssembly()!
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-                .InformationalVersion ?? "0.0.0";
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+                .InformationalVersion
+                .Split('+')[0];
 
     static readonly string AppTitle = $"Tirax Tunnel Space {AppVersion}";
 

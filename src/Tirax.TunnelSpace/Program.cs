@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.ReactiveUI;
 using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Flows;
@@ -11,9 +12,9 @@ namespace Tirax.TunnelSpace;
 
 sealed class Program
 {
-    static Eff<Unit> RunMainApp(IAppMainWindow mainVm) =>
+    static Func<IAppMainWindow, Eff<Unit>> RunMainApp(AkkaService akka) => mainVm =>
         (
-            from services in TunnelSpaceServices.Setup(new ServiceCollection())
+            from services in TunnelSpaceServices.Setup(akka, new ServiceCollection())
             let provider = services.AddSingleton<IAppMainWindow>(mainVm)
                                    .AddSingleton<IMainProgram, MainProgram>()
                                    .AddSingleton<IConnectionSelectionFlow, ConnectionSelectionFlow>()
@@ -36,26 +37,27 @@ sealed class Program
                             .LogToTrace()
                             .UseReactiveUI());
 
-    static Eff<AppBuilder> BuildMainApp() =>
-        BuildApp(RunMainApp);
-
     // Avalonia configuration, don't remove; also used by visual designer.
     // ReSharper disable once UnusedMember.Global
     public static AppBuilder BuildAvaloniaApp() =>
-        BuildMainApp().Run().ThrowIfFail();
+        BuildApp(_ => unitEff).Run().ThrowIfFail();
 
     static Eff<int> Run(Func<IAppMainWindow, Eff<Unit>> starter, Seq<string> args) =>
         from app in BuildApp(starter)
         from ret in Eff(() => app.StartWithClassicDesktopLifetime(args.ToArray()))
         select ret;
 
-    static Eff<int> MainEff(Seq<string> args) =>
-        Run(RunMainApp, args);
+    static Aff<int> MainEff(Seq<string> args) =>
+        from akka in Eff(() => new AkkaService())
+        from __1 in akka.Init
+        from ret in Run(RunMainApp(akka), args)
+        from __2 in akka.Shutdown
+        select ret;
 
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static int Main(string[] args) =>
-        MainEff(Seq(args)).Run().ThrowIfFail();
+    public static async Task<int> Main(string[] args) =>
+        (await MainEff(Seq(args)).Run()).ThrowIfFail();
 }

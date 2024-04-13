@@ -34,12 +34,12 @@ public sealed class SshManagerActor : UntypedActor
         ).RunUnit();
 
     static Eff<Process> StartSshProcess(TunnelConfig config) {
-        var portParameters = IsPortUnspecified(config.Port)? Seq.empty<string>() : Seq("-p ", config.Port.ToString());
+        var portParameters = IsPortUnspecified(config.Port)? Seq.empty<string>() : Seq("-p", config.Port.ToString());
         var processParameters = portParameters.Concat(Seq("-fN", config.Host,
                                                           "-L", $"{config.LocalPort}:{config.RemoteHost}:{config.RemotePort}"));
         return Eff(() => Process.Start("ssh", processParameters));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static bool IsPortUnspecified(short port) => port == 0;
+    static bool IsPortUnspecified(short port) => port is 0 or 22;
 }

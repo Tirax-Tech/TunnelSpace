@@ -2,11 +2,14 @@
 using Akka.Actor;
 using Akka.Configuration;
 using LanguageExt.Common;
+using CS = Akka.Actor.CoordinatedShutdown;
 
 namespace Tirax.TunnelSpace.EffHelpers;
 
 public static class ActorEff
 {
+    #region Actor helpers
+
     public static Aff<T> AskEff<T>(this ICanTell target, object message) =>
         Aff(() => target.Ask<T>(message).ToValue());
 
@@ -28,4 +31,13 @@ public static class ActorEff
         from result in message.Match<T,object>(v => v!, e => new Status.Failure(errorMapper.Apply(e).IfNone(e.ToException)))
         from _ in target.TellEff(result, sender)
         select unit;
+
+    #endregion
+
+    #region ActorSystem helpers
+
+    public static Aff<Unit> CoordinatedShutdown(this ActorSystem system, Option<CS.Reason> reason = default) =>
+        aff(async () => await CS.Get(system).Run(reason.IfNone(CS.ClrExitReason.Instance)));
+
+    #endregion
 }
