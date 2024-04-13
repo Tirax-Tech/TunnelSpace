@@ -55,17 +55,14 @@ public class TunnelConfigStorage : ITunnelConfigStorage
     public Aff<Seq<TunnelConfig>> All { get; }
 
     public Aff<TunnelConfig> Add(TunnelConfig config) =>
-        ChangeState(Eff(() =>
-        {
-            inMemoryStorage[config.Id] = config;
-            changes.OnNext(Change<TunnelConfig>.Added(config));
-            return config;
-        }));
+        Update(config);
 
-    public Aff<TunnelConfig> Update(TunnelConfig config)
-    {
-        throw new NotImplementedException();
-    }
+    public Aff<TunnelConfig> Update(TunnelConfig config) =>
+        ChangeState(from old in inMemoryStorage.SetEff(config.Id, config)
+                    let message = old.Match(o => Change<TunnelConfig>.Mapped(o, config),
+                                            () => Change<TunnelConfig>.Added(config))
+                    from __1 in changes.OnNextEff(message)
+                    select config);
 
     public Aff<Option<TunnelConfig>> Delete(Guid configId) =>
         ChangeState(Eff(() =>

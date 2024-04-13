@@ -1,16 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
-using Avalonia.Controls;
 using ReactiveUI;
 using Tirax.TunnelSpace.EffHelpers;
-using Tirax.TunnelSpace.Views;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
 public interface IAppMainWindow
 {
-    Eff<Window> CreateView { get; }
-
     Eff<ViewModelBase> CloseCurrentView { get; }
     Eff<ViewModelBase> PushView(ViewModelBase replacement);
     Eff<ViewModelBase> Replace(ViewModelBase replacement);
@@ -26,7 +22,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
                 .InformationalVersion ?? "0.0.0";
 
-    static readonly string AppTitle = $"Tirax Tunnel Space v{AppVersion}";
+    static readonly string AppTitle = $"Tirax Tunnel Space {AppVersion}";
 
     public MainWindowViewModel() {
         closeCurrentViewEff = Eff(history.Pop);
@@ -51,8 +47,6 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
             history.Push(view);
             return view;
         });
-
-    public Eff<Window> CreateView => Eff(() => (Window) new MainWindow { DataContext = this });
 
     public Eff<ViewModelBase> CloseCurrentView { get; }
     readonly Eff<ViewModelBase> closeCurrentViewEff;

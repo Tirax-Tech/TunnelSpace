@@ -20,4 +20,7 @@ public static class IObservableEff
             return unit;
         })
         select result;
+
+    public static Eff<Unit> OnNextEff<T>(this IObserver<T> observer, T value) =>
+        eff(() => observer.OnNext(value));
 }
