@@ -6,7 +6,6 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="Tirax.TunnelSpace.Views.LoadingScreenView"
 
-             x:DataType="vm:LoadingScreenViewModel"
-             Content="{Binding Text}">
-
+             x:DataType="vm:LoadingScreenViewModel">
+    <TextBox Text="{Binding Text}" TextWrapping="WrapWithOverflow" />
 </UserControl>
