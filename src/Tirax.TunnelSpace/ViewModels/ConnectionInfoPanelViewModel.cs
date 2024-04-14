@@ -48,6 +48,14 @@ public class ConnectionInfoPanelViewModel : ViewModelBase, IDisposable
         return unit;
     }
 
+    public Unit Stop() {
+        this.RaisePropertyChanging(nameof(IsPlaying));
+        Controller = None;
+        isPlaying = Observable.Empty<bool>().ToProperty(this, x => x.IsPlaying);
+        this.RaisePropertyChanged(nameof(IsPlaying));
+        return unit;
+    }
+
     public void Dispose() {
         Controller.Iter(c => c.Dispose());
     }

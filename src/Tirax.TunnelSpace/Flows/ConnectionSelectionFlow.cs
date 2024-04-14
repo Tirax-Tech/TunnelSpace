@@ -44,7 +44,7 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
     Eff<ConnectionInfoPanelViewModel> CreateInfoVm(TunnelConfig config) =>
         from vm in SuccessEff(new ConnectionInfoPanelViewModel(config))
         from _1 in vm.Edit.SubscribeEff(EditConnection)
-        from _2 in vm.PlayOrStop.SubscribeEff(_ => logger.LogResult(Play(vm)).ToBackground())
+        from _2 in vm.PlayOrStop.SubscribeEff(isPlaying => logger.LogResult(isPlaying? Stop(vm) : Play(vm)).ToBackground())
         select vm;
 
     Eff<Unit> EditConnection(TunnelConfig? config = default) =>
@@ -68,4 +68,12 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         from state in controller.Start
         from _ in Eff(() => vm.Play(controller, state))
         select unit;
+
+    static Eff<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
+        from controller in Eff(() => vm.Controller.Get())
+        from _1 in eff(controller.Dispose)
+        from _2 in Eff(vm.Stop)
+        select unit;
+
+
 }
