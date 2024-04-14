@@ -13,7 +13,9 @@ public interface IConnectionSelectionFlow
     Aff<ViewModelBase> Create { get; }
 }
 
-public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager, ITunnelConfigStorage storage) : IConnectionSelectionFlow
+public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager,
+                                            IUniqueId uniqueId,
+                                            ITunnelConfigStorage storage) : IConnectionSelectionFlow
 {
     public Aff<ViewModelBase> Create =>
         from allData in storage.All
@@ -43,23 +45,27 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
 
     Eff<ConnectionInfoPanelViewModel> CreateInfoVm(TunnelConfig config) =>
         from vm in SuccessEff(new ConnectionInfoPanelViewModel(config))
-        from _1 in vm.Edit.SubscribeEff(EditConnection)
+        from _1 in vm.Edit.SubscribeEff(c => EditConnection(c))
         from _2 in vm.PlayOrStop.SubscribeEff(isPlaying => logger.LogResult(isPlaying? Stop(vm) : Play(vm)).ToBackground())
         select vm;
 
-    Eff<Unit> EditConnection(TunnelConfig? config = default) =>
-        from view in SuccessEff(new TunnelConfigViewModel(config ?? TunnelConfig.CreateSample(Guid.Empty)))
-        from _1 in view.Save.SubscribeEff(c => Update(config is null, c).ToBackground())
+    Eff<Unit> EditConnection(Option<TunnelConfig> config = default) =>
+        from view in SuccessEff(new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample)))
+        from _1 in view.Save.SubscribeEff(c => Update(c).ToBackground())
         from _2 in view.Back.SubscribeEff(_ => mainWindow.CloseCurrentView.Ignore())
-        from _3 in view.Delete.SubscribeEff(_ => (from _1 in storage.Delete(view.Config.Id)
+        from _3 in view.Delete.SubscribeEff(_ => (from _1 in storage.Delete(view.Config.Id!.Value)
                                                   from _2 in mainWindow.CloseCurrentView
                                                   select unit
                                                  ).ToBackground())
         from _4 in mainWindow.PushView(view)
         select unit;
 
-    Aff<Unit> Update(bool isNew, TunnelConfig config) =>
-        from _1 in isNew ? storage.Add(config) : storage.Update(config)
+    Aff<Unit> Update(TunnelConfig config) =>
+        from _1 in config.Id is null
+                       ? from id in uniqueId.NewGuid
+                         from ret in storage.Add(config with { Id = id })
+                         select ret
+                       : storage.Update(config)
         from _2 in mainWindow.CloseCurrentView
         select unit;
 

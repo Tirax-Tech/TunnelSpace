@@ -36,7 +36,7 @@ public class TunnelConfigStorage : ITunnelConfigStorage
 
         var init =
             from configs in use(GetStore, Load)
-            let loadData = from config in configs select KeyValuePair.Create(config.Id, config)
+            let loadData = from config in configs select KeyValuePair.Create(config.Id!.Value, config)
             from _ in Eff(() => inMemoryStorage = new(loadData))
             select unit;
 
@@ -58,7 +58,7 @@ public class TunnelConfigStorage : ITunnelConfigStorage
         Update(config);
 
     public Aff<TunnelConfig> Update(TunnelConfig config) =>
-        ChangeState(from old in inMemoryStorage.SetEff(config.Id, config)
+        ChangeState(from old in inMemoryStorage.SetEff(config.Id!.Value, config)
                     let message = old.Match(o => Change<TunnelConfig>.Mapped(o, config),
                                             () => Change<TunnelConfig>.Added(config))
                     from __1 in changes.OnNextEff(message)

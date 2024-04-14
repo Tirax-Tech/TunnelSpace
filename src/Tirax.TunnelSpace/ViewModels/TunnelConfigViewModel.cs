@@ -10,10 +10,8 @@ public sealed class TunnelConfigViewModel : ViewModelBase
     [DesignOnly(true)]
     public TunnelConfigViewModel() : this(default) { }
 
-    public static TunnelConfigViewModel CreateSample() => new(NewConfig(Guid.NewGuid()));
-
     static TunnelConfig NewConfig(Guid id) =>
-        new(id, "localhost", 22, 2222, "localhost", 22, "New Tunnel");
+        new("localhost", 22, 2222, "localhost", 22, "New Tunnel", id);
 
     public ReactiveCommand<Unit, TunnelConfig> Delete { get; }
     public ReactiveCommand<Unit, TunnelConfig> Save { get; }
@@ -82,6 +80,6 @@ public sealed class TunnelConfigViewModel : ViewModelBase
         }
     }
 
-    public bool IsNew => Config.Id == Guid.Empty;
+    public bool IsNew => Config.Id is null;
     public string Title => IsNew ? "New Connection" : "Edit Connection";
 }

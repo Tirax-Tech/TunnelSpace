@@ -14,7 +14,7 @@ public class ConnectionInfoPanelViewModel : ViewModelBase, IDisposable
     ObservableAsPropertyHelper<bool> isPlaying;
 
     [DesignOnly(true)]
-    public ConnectionInfoPanelViewModel() : this(TunnelConfig.CreateSample(Guid.Empty)) { }
+    public ConnectionInfoPanelViewModel() : this(TunnelConfig.CreateSample()) { }
 
     public ConnectionInfoPanelViewModel(TunnelConfig tunnelConfig)
     {

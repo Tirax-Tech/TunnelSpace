@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
@@ -11,9 +10,9 @@ public sealed class ConnectionSelectionViewModel(Seq<ConnectionInfoPanelViewMode
     [DesignOnly(true)]
     public ConnectionSelectionViewModel() : this(
         Seq<ConnectionInfoPanelViewModel>(
-        new(TunnelConfig.CreateSample(Guid.NewGuid())),
-        new(TunnelConfig.CreateSample(Guid.NewGuid())),
-        new(TunnelConfig.CreateSample(Guid.NewGuid()))))
+        new(TunnelConfig.CreateSample()),
+        new(TunnelConfig.CreateSample()),
+        new(TunnelConfig.CreateSample())))
     { }
 
     public ObservableCollection<ConnectionInfoPanelViewModel> TunnelConfigs { get; } = new(init);
