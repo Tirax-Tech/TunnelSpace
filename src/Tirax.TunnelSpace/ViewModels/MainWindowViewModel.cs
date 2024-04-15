@@ -4,15 +4,14 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using ReactiveUI;
 using Tirax.TunnelSpace.EffHelpers;
-using static Tirax.TunnelSpace.Effects.Prelude;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
 public interface IAppMainWindow
 {
-    Eff<PageModelBase> CloseCurrentView { get; }
+    Aff<PageModelBase> CloseCurrentView { get; }
     Aff<PageModelBase> PushView(PageModelBase replacement);
-    Eff<PageModelBase> Replace(PageModelBase replacement);
+    Aff<PageModelBase> Replace(PageModelBase replacement);
 }
 
 public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
@@ -42,8 +41,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
         };
 
     public MainWindowViewModel() {
-        closeCurrentViewEff = Eff(history.Pop);
-        CloseCurrentView = this.ChangeProperties(ViewChangeProperties, closeCurrentViewEff);
+        CloseCurrentView = from v in this.ChangeProperties(ViewChangeProperties, Eff(history.Pop))
+                           from _2 in UiEff(() => Header = GetViewHeader(history.Pop()))
+                           select v;
         history.Push(new LoadingScreenViewModel());
         header = CreateTitleText(AppHeader);
     }
@@ -59,11 +59,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 
     public PageModelBase CurrentViewModel {
         get => history.Peek();
-        set => Replace(value).RunUnit();
+        set => Replace(value).RunIgnore();
     }
 
     public Aff<PageModelBase> PushView(PageModelBase view) =>
-        from _1 in UiEff(() => header = GetViewHeader(view))
+        from _1 in UiEff(() => Header = GetViewHeader(view))
         from v in this.ChangeProperty(nameof(CurrentViewModel), PushViewEff(view))
         select v;
 
@@ -81,12 +81,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
                 return view;
             });
 
-    public Eff<PageModelBase> CloseCurrentView { get; }
-    readonly Eff<PageModelBase> closeCurrentViewEff;
+    public Aff<PageModelBase> CloseCurrentView { get; }
 
-    public Eff<PageModelBase> Replace(PageModelBase replacement) =>
-        this.ChangeProperties(ViewChangeProperties,
-                        from current in closeCurrentViewEff
-                        from _ in PushViewEff(replacement)
-                        select current);
+    public Aff<PageModelBase> Replace(PageModelBase replacement) =>
+        from v in this.ChangeProperties(ViewChangeProperties, from current in Eff(history.Pop)
+                                                              from _ in PushViewEff(replacement)
+                                                              select current)
+        from _1 in UiEff(() => Header = GetViewHeader(history.Peek()))
+        select v;
 }

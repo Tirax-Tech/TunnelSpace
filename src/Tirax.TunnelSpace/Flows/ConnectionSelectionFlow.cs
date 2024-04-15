@@ -52,7 +52,7 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
     Aff<Unit> EditConnection(Option<TunnelConfig> config = default) =>
         from view in SuccessEff(new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample)))
         from _1 in view.Save.SubscribeEff(c => Update(c).ToBackground())
-        from _2 in view.Back.SubscribeEff(_ => mainWindow.CloseCurrentView.Ignore())
+        from _2 in view.Back.SubscribeEff(_ => mainWindow.CloseCurrentView.ToBackground())
         from _3 in view.Delete.SubscribeEff(_ => (from _1 in storage.Delete(view.Config.Id!.Value)
                                                   from _2 in mainWindow.CloseCurrentView
                                                   select unit

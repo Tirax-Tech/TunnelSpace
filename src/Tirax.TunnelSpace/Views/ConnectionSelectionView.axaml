@@ -15,36 +15,31 @@
         <vm:ConnectionSelectionViewModel />
     </Design.DataContext>
 
-    <DockPanel>
-        <TextBox UseFloatingWatermark="True" Classes="dense" Theme="{StaticResource FilledTextBox}"
-                 CornerRadius="100" Width="360" Margin="8"
-                 ma:TextFieldAssist.Label="Search connection" DockPanel.Dock="Top" />
-        <Canvas>
-            <ItemsControl ItemsSource="{Binding TunnelConfigs}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel Margin="8"
-                                   Width="{Binding $parent[Canvas].Bounds.Width}"
-                                   Height="{Binding $parent[Canvas].Bounds.Height}" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <ContentControl Content="{Binding}" />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-                <ItemsControl.Styles>
-                    <Style Selector="Button">
-                        <Setter Property="Margin" Value="0,0,12,12" />
-                    </Style>
-                </ItemsControl.Styles>
-            </ItemsControl>
-            <controls:FloatingButton Width="48" Height="48" Canvas.Bottom="12" Canvas.Right="12"
-                                     Command="{Binding NewConnectionCommand}">
-                <mi:MaterialIcon Kind="Plus" />
-            </controls:FloatingButton>
-        </Canvas>
-    </DockPanel>
+    <Canvas>
+        <ItemsControl ItemsSource="{Binding TunnelConfigs}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Margin="8"
+                               Width="{Binding $parent[Canvas].Bounds.Width}"
+                               Height="{Binding $parent[Canvas].Bounds.Height}" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <ContentControl Content="{Binding}" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+            <ItemsControl.Styles>
+                <Style Selector="Button">
+                    <Setter Property="Margin" Value="0,0,12,12" />
+                </Style>
+            </ItemsControl.Styles>
+        </ItemsControl>
+        <controls:FloatingButton Width="48" Height="48" Canvas.Bottom="12" Canvas.Right="12"
+                                 Command="{Binding NewConnectionCommand}">
+            <mi:MaterialIcon Kind="Plus" />
+        </controls:FloatingButton>
+    </Canvas>
 
     <UserControl.Styles>
         <Style Selector="v|ConnectionInfoPanelView">
