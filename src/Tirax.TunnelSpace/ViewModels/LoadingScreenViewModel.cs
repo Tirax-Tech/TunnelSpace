@@ -2,7 +2,7 @@
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public class LoadingScreenViewModel : ViewModelBase
+public class LoadingScreenViewModel : PageModelBase
 {
     string text = "Loading...";
 

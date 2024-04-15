@@ -8,13 +8,11 @@ static class AppCommands
 {
     public static ReactiveCommand<TunnelConfig, TunnelConfig> CreateEdit() =>
         ReactiveCommand.Create<TunnelConfig, TunnelConfig>(identity);
-
-    public static readonly ReactiveCommand<TunnelConfig, TunnelConfig> EditDummy = CreateEdit();
 }
 
 public interface IMainProgram
 {
-    Aff<ViewModelBase> Start { get; }
+    Aff<PageModelBase> Start { get; }
 }
 
 public sealed class MainProgram : IMainProgram
@@ -25,5 +23,5 @@ public sealed class MainProgram : IMainProgram
                 select initModel;
     }
 
-    public Aff<ViewModelBase> Start { get; }
+    public Aff<PageModelBase> Start { get; }
 }

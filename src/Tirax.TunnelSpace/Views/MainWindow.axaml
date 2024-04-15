@@ -30,7 +30,7 @@
             <mctrl:ColorZone Name="PART_AppBarContainer"
                              Height="56" Mode="PrimaryMid" ZIndex="1"
                              DockPanel.Dock="Top">
-                <DockPanel>
+                <DockPanel Name="PART_AppBarLayout">
                     <ToggleButton Name="NavDrawerSwitch"
                                   Width="32" Height="32" Margin="8"
                                   HorizontalContentAlignment="Center"
@@ -38,10 +38,7 @@
                         <mi:MaterialIcon Kind="Menu" Width="24" Height="24" />
                     </ToggleButton>
                     <Border Width="48" Height="48" DockPanel.Dock="Right" />
-                    <TextBlock Classes="Headline5"
-                               VerticalAlignment="Center" HorizontalAlignment="Center">
-                        Title
-                    </TextBlock>
+                    <ContentControl Content="{Binding Header}" />
                 </DockPanel>
             </mctrl:ColorZone>
             <ContentControl Content="{Binding CurrentViewModel}" />

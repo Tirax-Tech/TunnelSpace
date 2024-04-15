@@ -15,4 +15,7 @@ public static class EffHelper
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Eff<Unit> Ignore<T>(this Eff<T> eff) => eff.Map(_ => unit);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Aff<Unit> Ignore<T>(this Aff<T> eff) => eff.Map(_ => unit);
 }

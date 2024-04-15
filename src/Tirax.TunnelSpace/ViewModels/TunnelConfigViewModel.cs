@@ -5,7 +5,7 @@ using Tirax.TunnelSpace.Domain;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public sealed class TunnelConfigViewModel : ViewModelBase
+public sealed class TunnelConfigViewModel : PageModelBase
 {
     [DesignOnly(true)]
     public TunnelConfigViewModel() : this(default) { }

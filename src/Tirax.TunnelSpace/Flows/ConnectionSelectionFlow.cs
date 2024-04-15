@@ -10,20 +10,20 @@ namespace Tirax.TunnelSpace.Flows;
 
 public interface IConnectionSelectionFlow
 {
-    Aff<ViewModelBase> Create { get; }
+    Aff<PageModelBase> Create { get; }
 }
 
 public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager,
                                             IUniqueId uniqueId,
                                             ITunnelConfigStorage storage) : IConnectionSelectionFlow
 {
-    public Aff<ViewModelBase> Create =>
+    public Aff<PageModelBase> Create =>
         from allData in storage.All
         from configVms in allData.Map(CreateInfoVm).Sequence()
         let vm = new ConnectionSelectionViewModel(configVms)
         from _1 in storage.Changes.SubscribeEff(ListenStorageChange(vm))
-        from _2 in vm.NewConnectionCommand.SubscribeEff(_ => EditConnection())
-        select (ViewModelBase)vm;
+        from _2 in vm.NewConnectionCommand.SubscribeEff(_ => EditConnection().ToBackground())
+        select (PageModelBase)vm;
 
     Func<Change<TunnelConfig>, Eff<Unit>> ListenStorageChange(
         ConnectionSelectionViewModel vm) =>
@@ -45,11 +45,11 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
 
     Eff<ConnectionInfoPanelViewModel> CreateInfoVm(TunnelConfig config) =>
         from vm in SuccessEff(new ConnectionInfoPanelViewModel(config))
-        from _1 in vm.Edit.SubscribeEff(c => EditConnection(c))
+        from _1 in vm.Edit.SubscribeEff(c => EditConnection(c).ToBackground())
         from _2 in vm.PlayOrStop.SubscribeEff(isPlaying => logger.LogResult(isPlaying? Stop(vm) : Play(vm)).ToBackground())
         select vm;
 
-    Eff<Unit> EditConnection(Option<TunnelConfig> config = default) =>
+    Aff<Unit> EditConnection(Option<TunnelConfig> config = default) =>
         from view in SuccessEff(new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample)))
         from _1 in view.Save.SubscribeEff(c => Update(c).ToBackground())
         from _2 in view.Back.SubscribeEff(_ => mainWindow.CloseCurrentView.Ignore())

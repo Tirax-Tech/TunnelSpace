@@ -1,4 +1,7 @@
-﻿using Avalonia;
+﻿global using static Tirax.TunnelSpace.Effects.Prelude;
+global using Tirax.TunnelSpace.Effects;
+
+using Avalonia;
 using Avalonia.ReactiveUI;
 using System;
 using System.Threading.Tasks;
@@ -12,13 +15,16 @@ namespace Tirax.TunnelSpace;
 
 sealed class Program
 {
+    static Eff<ServiceProvider> CreateDiContainer(AkkaService akka, IAppMainWindow mainVm) =>
+        from services in TunnelSpaceServices.Setup(akka, new ServiceCollection())
+        select services.AddSingleton<IAppMainWindow>(mainVm)
+                       .AddSingleton<IMainProgram, MainProgram>()
+                       .AddSingleton<IConnectionSelectionFlow, ConnectionSelectionFlow>()
+                       .BuildServiceProvider();
+
     static Func<IAppMainWindow, Eff<Unit>> RunMainApp(AkkaService akka) => mainVm =>
         (
-            from services in TunnelSpaceServices.Setup(akka, new ServiceCollection())
-            let provider = services.AddSingleton<IAppMainWindow>(mainVm)
-                                   .AddSingleton<IMainProgram, MainProgram>()
-                                   .AddSingleton<IConnectionSelectionFlow, ConnectionSelectionFlow>()
-                                   .BuildServiceProvider()
+            from provider in CreateDiContainer(akka, mainVm)
             let start =
                 from main in provider.GetRequiredServiceEff<IMainProgram>()
                 from vm in main.Start

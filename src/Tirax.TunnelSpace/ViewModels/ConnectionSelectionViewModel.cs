@@ -5,7 +5,7 @@ using Tirax.TunnelSpace.Domain;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public sealed class ConnectionSelectionViewModel(Seq<ConnectionInfoPanelViewModel> init) : ViewModelBase
+public sealed class ConnectionSelectionViewModel(Seq<ConnectionInfoPanelViewModel> init) : PageModelBase
 {
     [DesignOnly(true)]
     public ConnectionSelectionViewModel() : this(
