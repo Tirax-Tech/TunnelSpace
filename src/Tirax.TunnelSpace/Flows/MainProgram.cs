@@ -19,7 +19,7 @@ public sealed class MainProgram : IMainProgram
 {
     public MainProgram(IAppMainWindow vm, IConnectionSelectionFlow flowConnectionSelection) {
         Start = from initModel in flowConnectionSelection.Create
-                from _________ in vm.PushView(initModel)
+                from _________ in vm.Replace(initModel)
                 select initModel;
     }
 

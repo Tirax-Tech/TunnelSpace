@@ -4,24 +4,17 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:lc="using:Tirax.TunnelSpace.Controls"
              xmlns:mi="using:Material.Icons.Avalonia"
-             xmlns:vm="using:Tirax.TunnelSpace.ViewModels"
+             xmlns:tunnelConfigPage="clr-namespace:Tirax.TunnelSpace.Features.TunnelConfigPage"
 
-             x:DataType="vm:TunnelConfigViewModel"
+             x:DataType="tunnelConfigPage:TunnelConfigViewModel"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="470"
-             x:Class="Tirax.TunnelSpace.Views.TunnelConfigView">
+             x:Class="Tirax.TunnelSpace.Features.TunnelConfigPage.TunnelConfigView">
     <UserControl.DataContext>
-        <vm:TunnelConfigViewModel/>
+        <tunnelConfigPage:TunnelConfigViewModel/>
     </UserControl.DataContext>
 
     <DockPanel>
-        <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-            <Button Theme="{StaticResource MaterialFlatButton}"
-                    Command="{Binding Back}">
-                <mi:MaterialIcon Kind="ArrowLeft" Margin="24" Width="24" Height="24" />
-            </Button>
-            <TextBlock Text="{Binding Title}" Classes="Headline5" VerticalAlignment="Center" Width="200" />
-        </StackPanel>
-        <StackPanel Name="ActionPanel" HorizontalAlignment="Center" Orientation="Horizontal" DockPanel.Dock="Bottom">
+        <StackPanel Name="ActionPanel" HorizontalAlignment="Center" Orientation="Horizontal" ZIndex="1" DockPanel.Dock="Bottom">
             <lc:MudButton IsVisible="{Binding !IsNew}" Command="{Binding Delete}">
                 Delete
             </lc:MudButton>

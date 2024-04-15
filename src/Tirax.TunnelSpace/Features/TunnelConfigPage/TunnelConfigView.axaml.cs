@@ -1,6 +1,6 @@
 ﻿using Avalonia.Controls;
 
-namespace Tirax.TunnelSpace.Views;
+namespace Tirax.TunnelSpace.Features.TunnelConfigPage;
 
 public partial class TunnelConfigView : UserControl
 {

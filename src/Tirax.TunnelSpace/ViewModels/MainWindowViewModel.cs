@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Reactive.Linq;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -20,6 +21,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
     string title = AppTitle;
     object header;
 
+    readonly ObservableAsPropertyHelper<bool> showMenu;
+
     static readonly string AppVersion =
         Assembly.GetEntryAssembly()!
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
@@ -36,17 +39,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
         {
             Classes = { "Headline5" },
             VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
             Text = text
         };
 
     public MainWindowViewModel() {
         CloseCurrentView = from v in this.ChangeProperties(ViewChangeProperties, Eff(history.Pop))
-                           from _2 in UiEff(() => Header = GetViewHeader(history.Pop()))
+                           from _2 in UiEff(() => Header = GetViewHeader(history.Peek()))
                            select v;
         history.Push(new LoadingScreenViewModel());
         header = CreateTitleText(AppHeader);
+
+        showMenu = this.WhenAnyValue(x => x.CurrentViewModel)
+                       .Select(_ => history.Count == 1)
+                       .ToProperty(this, x => x.ShowMenu);
+
+        BackCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ => await CloseCurrentView.RunUnit());
     }
+
     public string Title {
         get => title;
         set => this.RaiseAndSetIfChanged(ref title, value);
@@ -57,14 +66,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
         set => this.RaiseAndSetIfChanged(ref header, value);
     }
 
-    public PageModelBase CurrentViewModel {
-        get => history.Peek();
-        set => Replace(value).RunIgnore();
-    }
+    public PageModelBase CurrentViewModel => history.Peek();
+
+    public ReactiveCommand<Unit,Unit> BackCommand { get; }
+
+    public bool ShowMenu => showMenu.Value;
 
     public Aff<PageModelBase> PushView(PageModelBase view) =>
-        from _1 in UiEff(() => Header = GetViewHeader(view))
         from v in this.ChangeProperty(nameof(CurrentViewModel), PushViewEff(view))
+        from _1 in UiEff(() => Header = GetViewHeader(view))
         select v;
 
     static object GetViewHeader(PageModelBase view) =>

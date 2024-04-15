@@ -1,12 +1,17 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Reactive.Linq;
 using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
+using Tirax.TunnelSpace.ViewModels;
 
-namespace Tirax.TunnelSpace.ViewModels;
+namespace Tirax.TunnelSpace.Features.TunnelConfigPage;
 
 public sealed class TunnelConfigViewModel : PageModelBase
 {
+    TunnelConfig config;
+    readonly ObservableAsPropertyHelper<bool> isNew;
+
     [DesignOnly(true)]
     public TunnelConfigViewModel() : this(default) { }
 
@@ -18,13 +23,23 @@ public sealed class TunnelConfigViewModel : PageModelBase
     public ReactiveCommand<Unit, Unit> Back { get; } = ReactiveCommand.Create<Unit,Unit>(_ => unit);
 
     internal TunnelConfigViewModel(Option<TunnelConfig> initial = default) {
-        Config = initial.IfNone(() => NewConfig(Guid.Empty));
+        config = initial.IfNone(() => NewConfig(Guid.Empty));
 
-        Save = ReactiveCommand.Create<Unit, TunnelConfig>(_ => Config);
-        Delete = ReactiveCommand.Create<Unit, TunnelConfig>(_ => Config);
+        Save = ReactiveCommand.Create<Unit, TunnelConfig>(_ => config);
+        Delete = ReactiveCommand.Create<Unit, TunnelConfig>(_ => config);
+
+        isNew = this.WhenAnyValue(x => x.Config.Id)
+                    .Select(x => x is null)
+                    .ToProperty(this, x => x.IsNew);
+        this.WhenAnyValue(x => x.IsNew)
+            .Select(@new => @new ? "New Connection" : "Edit Connection")
+            .Subscribe(title => Header = title);
     }
 
-    public TunnelConfig Config { get; private set; }
+    public TunnelConfig Config {
+        get => config;
+        private set => this.RaiseAndSetIfChanged(ref config, value);
+    }
 
     public string Name {
         get => Config.Name;
@@ -80,6 +95,5 @@ public sealed class TunnelConfigViewModel : PageModelBase
         }
     }
 
-    public bool IsNew => Config.Id is null;
-    public string Title => IsNew ? "New Connection" : "Edit Connection";
+    public bool IsNew => isNew.Value;
 }

@@ -1,5 +1,4 @@
 ﻿global using static Tirax.TunnelSpace.Effects.Prelude;
-global using Tirax.TunnelSpace.Effects;
 
 using Avalonia;
 using Avalonia.ReactiveUI;
@@ -27,8 +26,7 @@ sealed class Program
             from provider in CreateDiContainer(akka, mainVm)
             let start =
                 from main in provider.GetRequiredServiceEff<IMainProgram>()
-                from vm in main.Start
-                from __ in mainVm.PushView(vm)
+                from _1 in main.Start
                 select unit
             from _ in start.MatchAff(_ => unitAff,
                                      e => mainVm.PushView(new LoadingScreenViewModel(e.ToString())).Ignore())

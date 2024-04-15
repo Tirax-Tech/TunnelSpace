@@ -31,13 +31,18 @@
                              Height="56" Mode="PrimaryMid" ZIndex="1"
                              DockPanel.Dock="Top">
                 <DockPanel Name="PART_AppBarLayout">
-                    <ToggleButton Name="NavDrawerSwitch"
+                    <Button Command="{Binding BackCommand}"
+                            Theme="{StaticResource MaterialFlatButton}" Foreground="{DynamicResource MaterialPrimaryMidForegroundBrush}"
+                            IsVisible="{Binding !ShowMenu}"
+                            Width="32" Height="32" Margin="8"
+                            DockPanel.Dock="Left">
+                        <mi:MaterialIcon Kind="ArrowLeft" Width="24" Height="24" />
+                    </Button>
+                    <ToggleButton Name="NavDrawerSwitch" IsVisible="{Binding ShowMenu}"
                                   Width="32" Height="32" Margin="8"
-                                  HorizontalContentAlignment="Center"
                                   DockPanel.Dock="Left">
                         <mi:MaterialIcon Kind="Menu" Width="24" Height="24" />
                     </ToggleButton>
-                    <Border Width="48" Height="48" DockPanel.Dock="Right" />
                     <ContentControl Content="{Binding Header}" />
                 </DockPanel>
             </mctrl:ColorZone>
