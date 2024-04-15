@@ -16,6 +16,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 {
     readonly Stack<ViewModelBase> history = new();
     string title = AppTitle;
+    bool drawerOpened;
 
     static readonly string AppVersion =
         Assembly.GetEntryAssembly()!
@@ -33,6 +34,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
     public string Title {
         get => title;
         set => this.RaiseAndSetIfChanged(ref title, value);
+    }
+
+    public bool DrawerOpened {
+        get => drawerOpened;
+        set => this.RaiseAndSetIfChanged(ref drawerOpened, value);
     }
 
     public ViewModelBase CurrentViewModel {

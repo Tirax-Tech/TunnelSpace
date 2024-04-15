@@ -3,19 +3,49 @@
         xmlns:vm="using:Tirax.TunnelSpace.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:mctrl="clr-namespace:Material.Styles.Controls;assembly=Material.Styles"
+        xmlns:mi="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
 
         mc:Ignorable="d" Width="890" Height="460"
         x:Class="Tirax.TunnelSpace.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="{Binding Title}"
-
-        Content="{Binding CurrentViewModel}">
+        Title="{Binding Title}" >
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
              to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
+
+    <mctrl:NavigationDrawer Name="LeftDrawer" Classes="permanent"
+                            LeftDrawerWidth="192"
+                            LeftDrawerOpened="{Binding ElementName=NavDrawerSwitch, Path=IsChecked, Mode=TwoWay}">
+        <mctrl:NavigationDrawer.LeftDrawerContent>
+            <ListBox Theme="{StaticResource NoScrollListBox}">
+                <ListBoxItem>Import / Export</ListBoxItem>
+            </ListBox>
+        </mctrl:NavigationDrawer.LeftDrawerContent>
+        <DockPanel>
+            <mctrl:ColorZone Name="PART_AppBarContainer"
+                             Height="56" Mode="PrimaryMid" ZIndex="1"
+                             DockPanel.Dock="Top">
+                <DockPanel>
+                    <ToggleButton Name="NavDrawerSwitch"
+                                  Width="32" Height="32" Margin="8"
+                                  HorizontalContentAlignment="Center"
+                                  DockPanel.Dock="Left">
+                        <mi:MaterialIcon Kind="Menu" Width="24" Height="24" />
+                    </ToggleButton>
+                    <Border Width="48" Height="48" DockPanel.Dock="Right" />
+                    <TextBlock Classes="Headline5"
+                               VerticalAlignment="Center" HorizontalAlignment="Center">
+                        Title
+                    </TextBlock>
+                </DockPanel>
+            </mctrl:ColorZone>
+            <ContentControl Content="{Binding CurrentViewModel}" />
+        </DockPanel>
+    </mctrl:NavigationDrawer>
 
 </Window>
