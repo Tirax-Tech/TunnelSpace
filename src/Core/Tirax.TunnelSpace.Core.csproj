@@ -8,7 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Akka" Version="1.5.18" />
+    <PackageReference Include="Akka" Version="1.5.19" />
+    <PackageReference Include="Akka.DependencyInjection" Version="1.5.19" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
     <PackageReference Include="ReactiveUI" Version="19.6.1" />

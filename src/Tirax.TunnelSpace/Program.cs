@@ -4,7 +4,9 @@ using Avalonia;
 using Avalonia.ReactiveUI;
 using System;
 using System.Threading.Tasks;
+using LanguageExt.Common;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Flows;
 using Tirax.TunnelSpace.Services;
@@ -14,28 +16,34 @@ namespace Tirax.TunnelSpace;
 
 sealed class Program
 {
-    static Eff<ServiceProvider> CreateDiContainer(AkkaService akka, IAppMainWindow mainVm) =>
-        from services in TunnelSpaceServices.Setup(akka, new ServiceCollection())
+    static Eff<ServiceProvider> CreateDiContainer(IAppMainWindow mainVm) =>
+        from services in TunnelSpaceServices.Setup(new ServiceCollection())
         select services.AddSingleton<IAppMainWindow>(mainVm)
                        .AddSingleton<IMainProgram, MainProgram>()
                        .AddSingleton<IConnectionSelectionFlow, ConnectionSelectionFlow>()
                        .BuildServiceProvider();
 
-    static Func<IAppMainWindow, Eff<Unit>> RunMainApp(AkkaService akka) => mainVm =>
-        (
-            from provider in CreateDiContainer(akka, mainVm)
-            let start =
-                from main in provider.GetRequiredServiceEff<IMainProgram>()
-                from _1 in main.Start
-                select unit
-            from _ in start.MatchAff(_ => unitAff,
-                                     e => mainVm.PushView(new LoadingScreenViewModel(e.ToString())).Ignore())
-            select unit
-        ).ToBackground();
+    static Func<Error, Aff<Unit>> DisplayError(IAppMainWindow mainVm) => e =>
+        mainVm.PushView(new LoadingScreenViewModel(e.ToString()));
 
-    static Eff<AppBuilder> BuildApp(Func<IAppMainWindow, Eff<Unit>> init) =>
+    static Eff<AppInit> RunMainApp(IAppMainWindow mainVm) =>
+        from provider in CreateDiContainer(mainVm)
+        from akka in provider.GetRequiredServiceEff<IAkka>()
+        from logger in provider.GetRequiredServiceEff<ILogger>()
+
+        let start = from _1 in akka.Init
+                    from main in provider.GetRequiredServiceEff<IMainProgram>()
+                    from _2 in main.Start
+                    select unit
+        let shutdown = akka.Shutdown
+
+        let displayError = DisplayError(mainVm)
+        select new AppInit(start | @catch(displayError),
+                           shutdown | @catch(e => logger.ErrorEff(e, "Error during shutdown")));
+
+    static Eff<AppBuilder> BuildApp(TaskCompletionSource<Aff<Unit>> initialized, Func<IAppMainWindow, Eff<AppInit>> init) =>
         // Application must be created inside the Configure function!
-        Eff(() => AppBuilder.Configure(() => new App(init))
+        Eff(() => AppBuilder.Configure(() => new App(initialized, init))
                             .UsePlatformDetect()
                             .WithInterFont()
                             .LogToTrace()
@@ -44,19 +52,18 @@ sealed class Program
     // Avalonia configuration, don't remove; also used by visual designer.
     // ReSharper disable once UnusedMember.Global
     public static AppBuilder BuildAvaloniaApp() =>
-        BuildApp(_ => unitEff).Run().ThrowIfFail();
+        BuildApp(new(), _ => SuccessEff(AppInit.DoNothing)).Run().ThrowIfFail();
 
-    static Eff<int> Run(Func<IAppMainWindow, Eff<Unit>> starter, Seq<string> args) =>
-        from app in BuildApp(starter)
+    static Aff<int> Run(Func<IAppMainWindow, Eff<AppInit>> starter, Seq<string> args) =>
+        from initialized in SuccessEff(new TaskCompletionSource<Aff<Unit>>())
+        from app in BuildApp(initialized, starter)
         from ret in Eff(() => app.StartWithClassicDesktopLifetime(args.ToArray()))
+        from shutdown in Aff(async () => await initialized.Task)
+        from _ in shutdown
         select ret;
 
     static Aff<int> MainEff(Seq<string> args) =>
-        from akka in Eff(() => new AkkaService())
-        from __1 in akka.Init
-        from ret in Run(RunMainApp(akka), args)
-        from __2 in akka.Shutdown
-        select ret;
+        Run(RunMainApp, args);
 
     // Initialization code. Don't use any Avalonia, third-party APIs or any
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized

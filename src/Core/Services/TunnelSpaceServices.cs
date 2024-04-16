@@ -6,14 +6,14 @@ namespace Tirax.TunnelSpace.Services;
 
 public static class TunnelSpaceServices
 {
-    public static Eff<IServiceCollection> Setup(AkkaService akka, IServiceCollection services) =>
+    public static Eff<IServiceCollection> Setup(IServiceCollection services) =>
         from tp in SuccessEff(TimeProviderEff.System)
         from now in tp.LocalNow
         from logger in LogSetup.Setup
         select services.AddSingleton(tp)
                        .AddSingleton(logger)
-                       .AddSingleton<IAkka>(akka)
-                       .AddSingleton<ISshManager>(_ => akka.SshManager)
+                       .AddSingleton<IAkka, AkkaService>()
+                       .AddSingleton<ISshManager>(sp => sp.GetRequiredService<IAkka>().SshManager)
                        .AddSingleton<ITunnelConfigStorage, TunnelConfigStorage>()
                        .AddSingleton<IUniqueId, UniqueId>();
 }

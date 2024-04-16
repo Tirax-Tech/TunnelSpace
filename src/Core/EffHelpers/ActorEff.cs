@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using Akka.Actor;
+using Akka.Actor.Setup;
 using Akka.Configuration;
 using LanguageExt.Common;
 using CS = Akka.Actor.CoordinatedShutdown;
@@ -18,9 +19,6 @@ public static class ActorEff
         from prop in SuccessEff(Props.Create(creator))
         from actor in Eff(() => context.ActorOf(prop, name.ToNullable()))
         select actor;
-
-    public static Eff<ActorSystem> CreateActorSystem(string name, Config config) =>
-        Eff(() => ActorSystem.Create(name, config));
 
     public static Eff<Unit> TellEff(this ICanTell target, object message, Option<IActorRef> sender = default) =>
         eff(() => target.Tell(message, sender.ToNullable()));
