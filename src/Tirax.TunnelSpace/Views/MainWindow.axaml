@@ -22,9 +22,17 @@
                             LeftDrawerWidth="192"
                             LeftDrawerOpened="{Binding ElementName=NavDrawerSwitch, Path=IsChecked, Mode=TwoWay}">
         <mctrl:NavigationDrawer.LeftDrawerContent>
-            <ListBox Theme="{StaticResource NoScrollListBox}">
-                <ListBoxItem>Import / Export</ListBoxItem>
-            </ListBox>
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding SidebarItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <MenuItem Header="{Binding Name}"
+                                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).GotoPageCommand}"
+                                      CommandParameter="{Binding Name}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </mctrl:NavigationDrawer.LeftDrawerContent>
         <DockPanel>
             <mctrl:ColorZone Name="PART_AppBarContainer"

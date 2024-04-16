@@ -8,15 +8,26 @@ using Tirax.TunnelSpace.EffHelpers;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
+public readonly record struct SidebarItem(string Name, Aff<PageModelBase> GetPage)
+{
+    public static implicit operator SidebarItem((string Name, Aff<PageModelBase> GetPage) tuple) =>
+        new(tuple.Name, tuple.GetPage);
+}
+
 public interface IAppMainWindow
 {
-    Aff<PageModelBase> CloseCurrentView { get; }
-    Aff<PageModelBase> PushView(PageModelBase replacement);
-    Aff<PageModelBase> Replace(PageModelBase replacement);
+    Aff<Unit> CloseCurrentView { get; }
+    Aff<Unit> PushView(PageModelBase replacement);
+    Aff<Unit> Replace(PageModelBase replacement);
+    Aff<Unit> Reset(PageModelBase replacement);
+
+    Eff<Unit> SetSidebar(Seq<SidebarItem> items);
 }
 
 public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 {
+    #region View controller
+
     readonly Stack<PageModelBase> history = new();
     string title = AppTitle;
     object header;
@@ -34,27 +45,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 
     static readonly Seq<string> ViewChangeProperties = Seq(nameof(CurrentViewModel), nameof(Header));
 
-    static object CreateTitleText(string text) =>
-        new TextBlock
+    static TextBlock CreateTitleText(string text) =>
+        new()
         {
             Classes = { "Headline5" },
             VerticalAlignment = VerticalAlignment.Center,
             Text = text
         };
-
-    public MainWindowViewModel() {
-        CloseCurrentView = from v in this.ChangeProperties(ViewChangeProperties, Eff(history.Pop))
-                           from _2 in UiEff(() => Header = GetViewHeader(history.Peek()))
-                           select v;
-        history.Push(new LoadingScreenViewModel());
-        header = CreateTitleText(AppHeader);
-
-        showMenu = this.WhenAnyValue(x => x.CurrentViewModel)
-                       .Select(_ => history.Count == 1)
-                       .ToProperty(this, x => x.ShowMenu);
-
-        BackCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ => await CloseCurrentView.RunUnit());
-    }
 
     public string Title {
         get => title;
@@ -72,10 +69,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 
     public bool ShowMenu => showMenu.Value;
 
-    public Aff<PageModelBase> PushView(PageModelBase view) =>
-        from v in this.ChangeProperty(nameof(CurrentViewModel), PushViewEff(view))
-        from _1 in UiEff(() => Header = GetViewHeader(view))
-        select v;
+    Aff<Unit> RefreshHeader { get; }
+
+    Aff<Unit> ChangeView(Eff<Unit> change) =>
+        from _1 in this.ChangeProperties(ViewChangeProperties, change)
+        from _2 in RefreshHeader
+        select unit;
+
+    Eff<Unit> PushViewEff(PageModelBase view) =>
+        eff(() => history.Push(view));
+
+    public Aff<Unit> PushView(PageModelBase view) =>
+        ChangeView(PushViewEff(view));
 
     static object GetViewHeader(PageModelBase view) =>
         view.Header switch
@@ -85,18 +90,50 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
             _        => view.Header
         };
 
-    Eff<PageModelBase> PushViewEff(PageModelBase view) =>
-        Eff(() => {
-                history.Push(view);
-                return view;
-            });
+    public Aff<Unit> CloseCurrentView { get; }
 
-    public Aff<PageModelBase> CloseCurrentView { get; }
+    public Aff<Unit> Replace(PageModelBase replacement) =>
+        ChangeView(from _1 in Eff(history.Pop)
+                   from _2 in PushViewEff(replacement)
+                   select unit);
 
-    public Aff<PageModelBase> Replace(PageModelBase replacement) =>
-        from v in this.ChangeProperties(ViewChangeProperties, from current in Eff(history.Pop)
-                                                              from _ in PushViewEff(replacement)
-                                                              select current)
-        from _1 in UiEff(() => Header = GetViewHeader(history.Peek()))
-        select v;
+    public Aff<Unit> Reset(PageModelBase replacement) =>
+        ChangeView(from _1 in eff(history.Clear)
+                   from _2 in PushViewEff(replacement)
+                   select unit);
+
+    #endregion
+
+    #region Menu sidebar
+
+    Seq<SidebarItem> sidebarItems;
+
+    public Seq<SidebarItem> SidebarItems => sidebarItems;
+
+    public Eff<Unit> SetSidebar(Seq<SidebarItem> items) =>
+        eff(() => this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)));
+
+    public ReactiveCommand<string,Unit> GotoPageCommand { get; }
+
+    #endregion
+
+    public MainWindowViewModel() {
+        RefreshHeader = UiEff(() => Header = GetViewHeader(history.Peek())).Ignore();
+        CloseCurrentView = ChangeView(Eff(history.Pop).Ignore());
+
+        history.Push(new LoadingScreenViewModel());
+        header = CreateTitleText(AppHeader);
+
+        showMenu = this.WhenAnyValue(x => x.CurrentViewModel)
+                       .Select(_ => history.Count == 1)
+                       .ToProperty(this, x => x.ShowMenu);
+
+        BackCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ => await CloseCurrentView.RunUnit());
+        GotoPageCommand = ReactiveCommand.CreateFromTask<string, Unit>(async page => await SidebarItems.Find(x => x.Name == page)
+                                                                                                       .Map(x => from p in x.GetPage
+                                                                                                                 from _ in Reset(p)
+                                                                                                                 select unit)
+                                                                                                       .IfNone(unitAff)
+                                                                                                       .RunUnit());
+    }
 }
