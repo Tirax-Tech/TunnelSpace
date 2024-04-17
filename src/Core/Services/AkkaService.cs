@@ -31,7 +31,7 @@ akka.actor.ask-timeout = 10s
 
     public AkkaService(IServiceProvider sp) {
         var sys = (from system in InitSystem(sp)
-                   from manager in system.CreateActor<SshManagerActor>(() => new SshManagerActor(), "ssh-manager")
+                   from manager in system.CreateActor<SshManagerActor>("ssh-manager")
                    from ___ in eff(() => {
                                        System = system;
                                        SshManager = new(manager);

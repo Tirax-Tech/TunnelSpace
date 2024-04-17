@@ -15,14 +15,13 @@ public interface IConnectionSelectionFlow
 }
 
 public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager,
-                                            IUniqueId uniqueId,
-                                            ITunnelConfigStorage storage) : IConnectionSelectionFlow
+                                            IUniqueId uniqueId) : IConnectionSelectionFlow
 {
     public Aff<PageModelBase> Create =>
-        from allData in storage.All
-        from configVms in allData.Map(CreateInfoVm).Sequence()
+        from allData in sshManager.All
+        from configVms in allData.ToSeq().Map(CreateInfoVm).Sequence()
         let vm = new ConnectionSelectionViewModel(configVms)
-        from _1 in storage.Changes.SubscribeEff(ListenStorageChange(vm))
+        from _1 in sshManager.Changes.SubscribeEff(ListenStorageChange(vm))
         from _2 in vm.NewConnectionCommand.SubscribeEff(_ => EditConnection().ToBackground())
         select (PageModelBase)vm;
 
@@ -54,7 +53,7 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         from view in SuccessEff(new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample)))
         from _1 in view.Save.SubscribeEff(c => Update(c).ToBackground())
         from _2 in view.Back.SubscribeEff(_ => mainWindow.CloseCurrentView.ToBackground())
-        from _3 in view.Delete.SubscribeEff(_ => (from _1 in storage.Delete(view.Config.Id!.Value)
+        from _3 in view.Delete.SubscribeEff(_ => (from _1 in sshManager.DeleteTunnel(view.Config.Id!.Value)
                                                   from _2 in mainWindow.CloseCurrentView
                                                   select unit
                                                  ).ToBackground())
@@ -64,16 +63,15 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
     Aff<Unit> Update(TunnelConfig config) =>
         from _1 in config.Id is null
                        ? from id in uniqueId.NewGuid
-                         from ret in storage.Add(config with { Id = id })
+                         from ret in sshManager.AddTunnel(config with { Id = id })
                          select ret
-                       : storage.Update(config)
+                       : sshManager.UpdateTunnel(config)
         from _2 in mainWindow.CloseCurrentView
         select unit;
 
     Aff<Unit> Play(ConnectionInfoPanelViewModel vm) =>
-        from controller in vm.Controller.Map(SuccessAff).IfNone(() => sshManager.CreateSshController(vm.Config))
-        from state in controller.Start
-        from _ in Eff(() => vm.Play(controller, state))
+        from _1 in sshManager.StartTunnel(vm.Config.Id!.Value)
+        from _ in Eff(() => vm.SetIsPlaying(state))
         select unit;
 
     static Eff<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
