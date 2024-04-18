@@ -22,34 +22,19 @@ public interface ISshManager
     IObservable<TunnelState> TunnelRunningStateChanges { get; }
 }
 
-public sealed class SshManager : ISshManager
+public sealed class SshManager(IUniqueId uniqueId, IActorRef manager) : ISshManager
 {
-    public SshManager(IUniqueId uniqueId, IActorRef manager) {
-        this.manager = manager;
-
-        All = manager.AskEff<TunnelConfig[]>(nameof(All));
-
-        Changes = manager.CreateObservable<Change<TunnelConfig>>(uniqueId);
-        TunnelRunningStateChanges = manager.CreateObservable<TunnelState>(uniqueId);
-    }
-
-    public Aff<TunnelConfig[]> All { get; }
+    public Aff<TunnelConfig[]> All { get; } = manager.AskEff<TunnelConfig[]>(nameof(All));
 
     public Aff<Unit> AddTunnel(TunnelConfig config) => manager.AskEff<Unit>((nameof(AddTunnel), config));
     public Aff<Unit> UpdateTunnel(TunnelConfig config) => manager.AskEff<Unit>((nameof(UpdateTunnel), config));
-
-    public Aff<ISshController> CreateSshController(TunnelConfig config) =>
-        from actor in manager.AskEff<IActorRef>((nameof(CreateSshController), config))
-        select (ISshController) new SshControllerWrapper(actor);
-
     public Aff<Unit> DeleteTunnel(Guid tunnelId) => manager.AskEff<Unit>((nameof(DeleteTunnel), tunnelId));
+
     public Aff<Unit> StartTunnel(Guid tunnelId)  => manager.AskEff<Unit>((nameof(StartTunnel), tunnelId));
     public Aff<Unit> StopTunnel(Guid tunnelId)   => manager.AskEff<Unit>((nameof(StopTunnel), tunnelId));
 
-    public IObservable<Change<TunnelConfig>> Changes { get; }
-    public IObservable<TunnelState> TunnelRunningStateChanges { get; }
-
-    readonly IActorRef manager;
+    public IObservable<Change<TunnelConfig>> Changes { get; } = manager.CreateObservable<Change<TunnelConfig>>(uniqueId);
+    public IObservable<TunnelState> TunnelRunningStateChanges { get; } = manager.CreateObservable<TunnelState>(uniqueId);
 }
 
 public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
@@ -87,10 +72,12 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
         {
             nameof(ISshManager.All) => Sender.Respond(SuccessEff(tunnels.Values.Map(t => t.Config).ToArray())),
 
-            (nameof(ISshManager.DeleteTunnel), Guid tunnelId) => Sender.Respond(from _ in storage.Delete(tunnelId) select unit),
+            (nameof(ISshManager.AddTunnel), TunnelConfig config) => Sender.Respond(AddTunnel(config)),
+            (nameof(ISshManager.UpdateTunnel), TunnelConfig config) => Sender.Respond(UpdateTunnel(config)),
+            (nameof(ISshManager.DeleteTunnel), Guid tunnelId) => Sender.Respond(DeleteTunnel(tunnelId)),
 
-            (nameof(ISshManager.StartTunnel), Guid tunnelId) => StartTunnel(tunnelId),
-            (nameof(ISshManager.StopTunnel), Guid tunnelId) => StopTunnel(tunnelId),
+            (nameof(ISshManager.StartTunnel), Guid tunnelId) => Sender.Respond(StartTunnel(tunnelId)),
+            (nameof(ISshManager.StopTunnel), Guid tunnelId) => Sender.Respond(StopTunnel(tunnelId)),
 
             ObservableBridge.SubscribeObservable<Change<TunnelConfig>> m => m.Apply(changes, observableDisposables),
             ObservableBridge.SubscribeObservable<TunnelState> m          => m.Apply(tunnelRunningStateChanges, observableDisposables),
@@ -99,35 +86,50 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
             _ => UnhandledEff(message)
         };
 
-    Eff<Unit> StartTunnel(Guid tunnelId) =>
-        from __ in unitEff
-        let startTunnel =
-            from tunnel in tunnels.GetEff(tunnelId)
-            let config = tunnel.Config
-            let createNewActor = from actor in Context.CreateActor<SshController>($"ssh-connection-{config.Id}", config)
-                                 from _1 in tunnels.Set(tunnelId, tunnel with { Controller = Some(actor) })
-                                 select actor
-            from actor in tunnel.Controller.ToEff() | createNewActor
-            let controller = new SshControllerWrapper(actor)
-            from playState in controller.Start
-            from _2 in eff(() => playState.Subscribe(isPlaying => tunnelRunningStateChanges.OnNext(new TunnelState(tunnelId, isPlaying))))
-            select unit
-        from _1 in Sender.Respond(startTunnel
-                                | @catch(AppStandardErrors.NotFound, AppStandardErrors.NotFoundFromKey(tunnelId.ToString())))
+    Aff<Unit> AddTunnel(TunnelConfig config) =>
+        from _1 in storage.Add(config)
+        from _2 in tunnels.Set(config.Id!.Value, new SshTunnelItem(config))
+        from _3 in changes.OnNextEff(Change<TunnelConfig>.Added(config))
         select unit;
 
-    Eff<Unit> StopTunnel(Guid tunnelId) =>
-        from __ in unitEff
-        let stopTunnel =
-            from tunnel in tunnels.GetEff(tunnelId)
-            from actor in tunnel.Controller.ToEff()
-                        | FailEff<IActorRef>(AppStandardErrors.Unexpected($"Controller for {tunnelId} has not been started"))
-            let controller = new SshControllerWrapper(actor)
-            from _1 in controller.DisposeEff()
-            from _2 in tunnels.Set(tunnelId, tunnel with { Controller = None })
-            select unit
-        from _1 in Sender.Respond(stopTunnel
-                                | @catch(AppStandardErrors.NotFound, AppStandardErrors.NotFoundFromKey(tunnelId.ToString())))
+    Aff<Unit> UpdateTunnel(TunnelConfig config) =>
+        from old in tunnels.GetEff(config.Id!.Value)
+        from _1 in storage.Update(config)
+        from _2 in StopController(old) | @catch(AppErrors.ControllerNotStarted, unit)
+        from _3 in tunnels.Set(config.Id!.Value, new(config))
+        from _4 in changes.OnNextEff(Change<TunnelConfig>.Mapped(old.Config, config))
+        select unit;
+
+    Aff<Unit> DeleteTunnel(Guid tunnelId) =>
+        from tunnel in tunnels.TakeOut(tunnelId)
+        from _1 in StopController(tunnel) | @catch(AppErrors.ControllerNotStarted, unit)
+        from _2 in storage.Delete(tunnelId)
+        from _3 in changes.OnNextEff(Change<TunnelConfig>.Removed(tunnel.Config))
+        select unit;
+
+    Aff<Unit> StartTunnel(Guid tunnelId) =>
+        from tunnel in tunnels.GetEff(tunnelId, tunnelId.ToString())
+        let config = tunnel.Config
+        let createNewActor = from actor in Context.CreateActor<SshController>($"ssh-connection-{config.Id}", config)
+                             from _1 in tunnels.Set(tunnelId, tunnel with { Controller = Some(actor) })
+                             select actor
+        from actor in tunnel.Controller.ToEff() | createNewActor
+        let controller = new SshControllerWrapper(actor)
+        from playState in controller.Start
+        from _2 in eff(() => playState.Subscribe(isPlaying => tunnelRunningStateChanges.OnNext(new TunnelState(tunnelId, isPlaying))))
+        select unit;
+
+    Aff<Unit> StopTunnel(Guid tunnelId) =>
+        from tunnel in tunnels.GetEff(tunnelId, tunnelId.ToString())
+        from _ in StopController(tunnel)
+        select unit;
+
+    Eff<Unit> StopController(SshTunnelItem tunnel) =>
+        from tunnelId in SuccessEff(tunnel.Config.Id!.Value)
+        from actor in tunnel.Controller.ToEff() | FailEff<IActorRef>(AppErrors.ControllerNotStarted)
+        let controller = new SshControllerWrapper(actor)
+        from _1 in controller.DisposeEff()
+        from _2 in tunnels.Set(tunnelId, tunnel with { Controller = None })
         select unit;
 
     // TODO: move this into SshController

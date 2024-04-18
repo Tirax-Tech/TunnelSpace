@@ -5,10 +5,13 @@ namespace Tirax.TunnelSpace.EffHelpers;
 
 public static class CollectionEff
 {
-    public static Eff<V> GetEff<K, V>(this IDictionary<K, V> dict, K key) =>
-        from getValue in Eff(() => dict.TryGetValue(key, out var v)
-                                       ? SuccessEff(v)
-                                       : FailEff<V>(AppStandardErrors.NotFound))
+    public static Eff<V> GetEff<K, V>(this IDictionary<K, V> dict, K key, Option<string> keyName = default) =>
+        from getValue in Eff(() => {
+                                 var success = dict.TryGetValue(key, out var v);
+                                     return success
+                                            ? SuccessEff(v)
+                                            : FailEff<V>(keyName.Map(AppStandardErrors.NotFoundFromKey).IfNone(AppStandardErrors.NotFound));
+                             })
         from v in getValue
         select v;
 

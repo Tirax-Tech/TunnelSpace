@@ -1,5 +1,4 @@
-﻿using System;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using ReactiveUI;
 
 namespace Tirax.TunnelSpace.EffHelpers;
@@ -12,6 +11,9 @@ public static class IObservableEff
 
     public static Eff<IDisposable> SubscribeEff<T>(this IObservable<T> observable, Func<T,Eff<Unit>> handler) =>
         Eff(() => observable.Subscribe(x => handler(x).RunUnit()));
+
+    public static Eff<IDisposable> SubscribeEff<T>(this IObservable<T> observable, Func<T,Aff<Unit>> handler) =>
+        Eff(() => observable.Subscribe(x => handler(x).ToBackground().RunUnit()));
 
     public static Eff<T> ChangeProperties<T>(this IReactiveObject sender, Seq<string> caller, Eff<T> viewSetter) =>
         from _1 in eff(() => caller.Iter(sender.RaisePropertyChanging))
