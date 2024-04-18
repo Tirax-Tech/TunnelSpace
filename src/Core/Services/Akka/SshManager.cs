@@ -1,10 +1,7 @@
-﻿using System.Diagnostics;
-using System.Reactive.Subjects;
-using System.Runtime.CompilerServices;
+﻿using System.Reactive.Subjects;
 using Akka.Actor;
 using Tirax.TunnelSpace.Domain;
 using Tirax.TunnelSpace.EffHelpers;
-using Seq = LanguageExt.Seq;
 
 namespace Tirax.TunnelSpace.Services.Akka;
 
@@ -57,8 +54,10 @@ public sealed class SshManager : ISshManager
 
 public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
 {
+    sealed record SshTunnelItem(TunnelConfig Config, Option<IActorRef> Controller = default);
+
     readonly ITunnelConfigStorage storage;
-    readonly Dictionary<Guid, IActorRef> sshControllers  = new();
+    Dictionary<Guid, SshTunnelItem> tunnels = new();
     readonly Dictionary<Guid, IDisposable> observableDisposables = new();
     readonly Subject<Change<TunnelConfig>> changes = new();
     readonly Subject<TunnelState> tunnelRunningStateChanges = new();
@@ -94,11 +93,23 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
                                select unit),
 
             (nameof(ISshManager.StartTunnel), Guid tunnelId) =>
-                Sender.Respond((from config in tunnels.GetEff(tunnelId).Map(t => t.Config)
-                                let process = StartSshProcess(config)
-                                from actor in Context.CreateActor<SshController>($"ssh-connection-{config.Id}", process)
-                                select actor)
-                             | @catch(AppStandardErrors.NotFound, AppStandardErrors.NotFoundFromKey(tunnelId.ToString()))),
+                from __ in unitEff
+                let startTunnel =
+                    from tunnel in tunnels.GetEff(tunnelId)
+                    let config = tunnel.Config
+                    let createNewActor = from actor in Context.CreateActor<SshController>($"ssh-connection-{config.Id}", config)
+                                         from _1 in tunnels.Set(tunnelId, tunnel with { Controller = Some(actor) })
+                                         select actor
+                    from actor in tunnel.Controller.ToEff() | createNewActor
+                    let controller = new SshControllerWrapper(actor)
+                    from playState in controller.Start
+                    from _2 in eff(() => playState.Subscribe(isPlaying =>
+                                                                 tunnelRunningStateChanges.OnNext(new TunnelState(tunnelId, isPlaying))
+                                                            ))
+                    select unit
+                from _1 in Sender.Respond(startTunnel
+                                        | @catch(AppStandardErrors.NotFound, AppStandardErrors.NotFoundFromKey(tunnelId.ToString())))
+                select unit,
 
             ObservableBridge.SubscribeObservable<Change<TunnelConfig>> m => m.Apply(changes, observableDisposables),
             ObservableBridge.SubscribeObservable<TunnelState> m          => m.Apply(tunnelRunningStateChanges, observableDisposables),
@@ -107,23 +118,12 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
             _ => UnhandledEff(message)
         };
 
-    sealed record SshTunnelItem(TunnelConfig Config, Option<IActorRef> Controller = default);
-    Dictionary<Guid, SshTunnelItem> tunnels = new();
-
     // TODO: move this into SshController
-    static Eff<Process> StartSshProcess(TunnelConfig config) {
-        var portParameters = IsPortUnspecified(config.Port)? Seq.empty<string>() : Seq("-p", config.Port.ToString());
-        var processParameters = portParameters.Concat(Seq("-fN", config.Host,
-                                                          "-L", $"{config.LocalPort}:{config.RemoteHost}:{config.RemotePort}"));
-        return Eff(() => Process.Start("ssh", processParameters));
-    }
-
     protected override void PostStop() {
+        changes.OnCompleted();
+        tunnelRunningStateChanges.OnCompleted();
         observableDisposables.Values.Iter(d => d.Dispose());
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static bool IsPortUnspecified(short port) => port is 0 or 22;
 
     protected override Eff<Unit> PreStartEff { get; }
     public IStash Stash { get; set; } = default!;

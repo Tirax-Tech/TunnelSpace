@@ -1,7 +1,10 @@
 ﻿using System.Diagnostics;
 using System.Reactive.Subjects;
+using System.Runtime.CompilerServices;
 using Akka.Actor;
+using Tirax.TunnelSpace.Domain;
 using Tirax.TunnelSpace.EffHelpers;
+using Seq = LanguageExt.Seq;
 
 namespace Tirax.TunnelSpace.Services.Akka;
 
@@ -19,7 +22,7 @@ sealed class SshControllerWrapper(IActorRef actor) : ISshController
         actor.Tell(nameof(Dispose));
 }
 
-public sealed class SshController(Eff<Process> startSsh) : UntypedActor
+public sealed class SshController(TunnelConfig config) : UntypedActor
 {
     BehaviorSubject<bool> state = new(false);
     Option<Process> process;
@@ -33,7 +36,7 @@ public sealed class SshController(Eff<Process> startSsh) : UntypedActor
          {
              nameof(ISshController.Start) =>
                  Sender.Respond(from _1 in CloseCurrentProcess()
-                                from started in startSsh
+                                from started in StartSshProcess(config)
                                 from _2 in OnStarted(started)
                                 select state),
 
@@ -47,6 +50,16 @@ public sealed class SshController(Eff<Process> startSsh) : UntypedActor
              _ => unitEff
          }
         ).RunUnit();
+
+    static Eff<Process> StartSshProcess(TunnelConfig config) {
+        var portParameters = IsPortUnspecified(config.Port)? Seq.empty<string>() : Seq("-p", config.Port.ToString());
+        var processParameters = portParameters.Concat(Seq("-fN", config.Host,
+                                                          "-L", $"{config.LocalPort}:{config.RemoteHost}:{config.RemotePort}"));
+        return Eff(() => Process.Start("ssh", processParameters));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static bool IsPortUnspecified(short port) => port is 0 or 22;
 
     Eff<Unit> OnStarted(Process p) =>
         eff(() => {
