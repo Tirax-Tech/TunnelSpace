@@ -13,20 +13,26 @@ static class AppCommands
 
 public interface IMainProgram
 {
-    Aff<Unit> Start { get; }
+    EitherAsync<Error, Unit> Start();
 }
 
 public sealed class MainProgram : IMainProgram
 {
-    public MainProgram(IAppMainWindow vm, IConnectionSelectionFlow flowConnectionSelection) {
+    readonly IAppMainWindow vm;
+    readonly IConnectionSelectionFlow flowConnectionSelection;
 
-        Start = from model in flowConnectionSelection.Create
-                let sidebar = Seq<SidebarItem>(("Home", flowConnectionSelection.Create),
-                                               ("Import/Export", Eff(() => (PageModelBase)new ImportExportViewModel())))
-                from ____1 in vm.SetSidebar(sidebar)
-                from ____2 in vm.Reset(model)
-                select unit;
+    public MainProgram(IAppMainWindow vm, IConnectionSelectionFlow flowConnectionSelection) {
+        this.vm = vm;
+        this.flowConnectionSelection = flowConnectionSelection;
     }
 
-    public Aff<Unit> Start { get; }
+    public EitherAsync<Error, Unit> Start() {
+        var sidebar = Seq<SidebarItem>(("Home", Aff(async () => (await flowConnectionSelection.Create()).ToAff(identity)).Bind(identity)),
+                                       ("Import/Export", Eff(() => (PageModelBase)new ImportExportViewModel())));
+        vm.SetSidebar(sidebar).RunUnit();
+
+         return from model in flowConnectionSelection.Create()
+                let ____1 = vm.Reset(model).RunUnit()
+                select unit;
+    }
 }

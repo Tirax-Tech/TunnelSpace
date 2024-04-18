@@ -5,11 +5,11 @@ using Tirax.TunnelSpace.EffHelpers;
 
 namespace Tirax.TunnelSpace.Services.Akka;
 
-public sealed record TunnelState(Guid TunnelId, bool IsRunning);
+public sealed record TunnelState(TunnelConfig Config, bool IsRunning);
 
 public interface ISshManager
 {
-    Aff<TunnelConfig[]> All { get; }
+    EitherAsync<Error, Seq<TunnelState>> RetrieveState();
 
     Aff<Unit> AddTunnel(TunnelConfig config);
     Aff<Unit> UpdateTunnel(TunnelConfig config);
@@ -24,7 +24,9 @@ public interface ISshManager
 
 public sealed class SshManager(IUniqueId uniqueId, IActorRef manager) : ISshManager
 {
-    public Aff<TunnelConfig[]> All { get; } = manager.AskEff<TunnelConfig[]>(nameof(All));
+    public EitherAsync<Error, Seq<TunnelState>> RetrieveState() =>
+        from configs in manager.SafeAsk<TunnelState[]>(nameof(RetrieveState))
+        select configs.ToSeq();
 
     public Aff<Unit> AddTunnel(TunnelConfig config) => manager.AskEff<Unit>((nameof(AddTunnel), config));
     public Aff<Unit> UpdateTunnel(TunnelConfig config) => manager.AskEff<Unit>((nameof(UpdateTunnel), config));
@@ -37,7 +39,7 @@ public sealed class SshManager(IUniqueId uniqueId, IActorRef manager) : ISshMana
     public IObservable<TunnelState> TunnelRunningStateChanges { get; } = manager.CreateObservable<TunnelState>(uniqueId);
 }
 
-public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
+public sealed class SshManagerActor : UntypedActor, IWithUnboundedStash
 {
     sealed record SshTunnelItem(TunnelConfig Config, Option<IActorRef> Controller = default);
 
@@ -49,42 +51,53 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
 
     public SshManagerActor(ITunnelConfigStorage storage) {
         this.storage = storage;
-        PreStartEff = from _1 in BecomeStacked(m => m switch
-                                                    {
-                                                        Fin<TunnelConfig[]> data => from _1 in SetTunnels(data.ThrowIfFail())
-                                                                                    from _2 in UnbecomeStacked
-                                                                                    from _3 in eff(Stash.UnstashAll)
-                                                                                    select unit,
-                                                        _ => eff(Stash.Stash)
-                                                    })
-                      select unit;
         Self.PipeFrom(from data in storage.All select data.ToArray());
-        return;
-
-        Eff<Unit> SetTunnels(TunnelConfig[] configs) =>
-            eff(() => tunnels = (from config in configs
-                                 select KeyValuePair.Create(config.Id!.Value, new SshTunnelItem(config))
-                                ).ToDictionary());
     }
 
-    protected override Eff<Unit> OnReceiveEff(object message) =>
-        message switch
-        {
-            nameof(ISshManager.All) => Sender.Respond(SuccessEff(tunnels.Values.Map(t => t.Config).ToArray())),
+    protected override void PreStart() {
+        BecomeStacked(m => {
+                          switch (m) {
+                              case Fin<TunnelConfig[]> data: {
+                                  tunnels = (from config in data.ThrowIfFail()
+                                             select KeyValuePair.Create(config.Id!.Value, new SshTunnelItem(config))
+                                            ).ToDictionary();
+                                  UnbecomeStacked();
+                                  Stash.UnstashAll();
+                                  break;
+                              }
+                              default:
+                                  ToUnit(Stash.Stash);
+                                  break;
+                          }
+                      });
+    }
 
-            (nameof(ISshManager.AddTunnel), TunnelConfig config) => Sender.Respond(AddTunnel(config)),
-            (nameof(ISshManager.UpdateTunnel), TunnelConfig config) => Sender.Respond(UpdateTunnel(config)),
-            (nameof(ISshManager.DeleteTunnel), Guid tunnelId) => Sender.Respond(DeleteTunnel(tunnelId)),
+    protected override void OnReceive(object message) =>
+        Void(message switch
+               {
+                   nameof(ISshManager.RetrieveState) => Sender.TellEx(RetrieveState()),
 
-            (nameof(ISshManager.StartTunnel), Guid tunnelId) => Sender.Respond(StartTunnel(tunnelId)),
-            (nameof(ISshManager.StopTunnel), Guid tunnelId) => Sender.Respond(StopTunnel(tunnelId)),
+                   (nameof(ISshManager.AddTunnel), TunnelConfig config)    => Sender.Respond(AddTunnel(config)).RunUnit(),
+                   (nameof(ISshManager.UpdateTunnel), TunnelConfig config) => Sender.Respond(UpdateTunnel(config)).RunUnit(),
+                   (nameof(ISshManager.DeleteTunnel), Guid tunnelId)       => Sender.Respond(DeleteTunnel(tunnelId)).RunUnit(),
 
-            ObservableBridge.SubscribeObservable<Change<TunnelConfig>> m => m.Apply(changes, observableDisposables),
-            ObservableBridge.SubscribeObservable<TunnelState> m          => m.Apply(tunnelRunningStateChanges, observableDisposables),
-            ObservableBridge.UnsubscribeObservable m                     => m.Apply(observableDisposables),
+                   (nameof(ISshManager.StartTunnel), Guid tunnelId) => Sender.Respond(StartTunnel(tunnelId)).RunUnit(),
+                   (nameof(ISshManager.StopTunnel), Guid tunnelId)  => Sender.Respond(StopTunnel(tunnelId)).RunUnit(),
 
-            _ => UnhandledEff(message)
-        };
+                   ObservableBridge.SubscribeObservable<Change<TunnelConfig>> m => m.Apply(changes, observableDisposables).RunUnit(),
+                   ObservableBridge.SubscribeObservable<TunnelState> m          => m.Apply(tunnelRunningStateChanges, observableDisposables).RunUnit(),
+                   ObservableBridge.UnsubscribeObservable m                     => m.Apply(observableDisposables).RunUnit(),
+
+                   _ => UnhandledMessage(message)
+               });
+
+    Unit UnhandledMessage(object message) {
+        Unhandled(message);
+        return unit;
+    }
+
+    Either<Error, TunnelState[]> RetrieveState() =>
+        tunnels.Values.Map(t => new TunnelState(t.Config, t.Controller.IsSome)).ToArray();
 
     Aff<Unit> AddTunnel(TunnelConfig config) =>
         from _1 in storage.Add(config)
@@ -116,7 +129,7 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
         from actor in tunnel.Controller.ToEff() | createNewActor
         let controller = new SshControllerWrapper(actor)
         from playState in controller.Start
-        from _2 in eff(() => playState.Subscribe(isPlaying => tunnelRunningStateChanges.OnNext(new TunnelState(tunnelId, isPlaying))))
+        from _2 in eff(() => playState.Subscribe(isPlaying => tunnelRunningStateChanges.OnNext(new TunnelState(config, isPlaying))))
         select unit;
 
     Aff<Unit> StopTunnel(Guid tunnelId) =>
@@ -132,13 +145,11 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
         from _2 in tunnels.Set(tunnelId, tunnel with { Controller = None })
         select unit;
 
-    // TODO: move this into SshController
     protected override void PostStop() {
         changes.OnCompleted();
         tunnelRunningStateChanges.OnCompleted();
         observableDisposables.Values.Iter(d => d.Dispose());
     }
 
-    protected override Eff<Unit> PreStartEff { get; }
     public IStash Stash { get; set; } = default!;
 }

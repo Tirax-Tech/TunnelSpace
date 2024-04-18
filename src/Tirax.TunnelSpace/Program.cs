@@ -4,7 +4,6 @@ using Avalonia;
 using Avalonia.ReactiveUI;
 using System;
 using System.Threading.Tasks;
-using LanguageExt.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Tirax.TunnelSpace.EffHelpers;
@@ -33,7 +32,7 @@ sealed class Program
 
         let start = from _1 in akka.Init
                     from main in provider.GetRequiredServiceEff<IMainProgram>()
-                    from _2 in main.Start
+                    from _2 in Aff(async () => (await main.Start()).IfLeft(e => logger.Error(e, "Error during startup")))
                     select unit
         let shutdown = akka.Shutdown
 

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
-using LanguageExt.Common;
 using Serilog;
 using Tirax.TunnelSpace.Domain;
 using Tirax.TunnelSpace.EffHelpers;
@@ -13,18 +12,18 @@ namespace Tirax.TunnelSpace.Flows;
 
 public interface IConnectionSelectionFlow
 {
-    Aff<PageModelBase> Create { get; }
+    EitherAsync<Error, PageModelBase> Create();
 }
 
 public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager,
                                             IUniqueId uniqueId) : IConnectionSelectionFlow
 {
-    public Aff<PageModelBase> Create =>
-        from allData in sshManager.All
-        from configVms in allData.ToSeq().Map(CreateInfoVm).Sequence()
+    public EitherAsync<Error, PageModelBase> Create() =>
+        from allData in sshManager.RetrieveState()
+        let configVms = allData.Map(i => CreateInfoVm(i.Config, i.IsRunning).Run().ThrowIfFail())
         let vm = new ConnectionSelectionViewModel(configVms)
-        from _1 in sshManager.Changes.SubscribeEff(ListenStorageChange(vm))
-        from _2 in vm.NewConnectionCommand.SubscribeEff(_ => EditConnection() | @catch(LogError("new connection")))
+        let _1 = sshManager.Changes.Subscribe(x => ListenStorageChange(vm)(x).RunUnit())
+        let _2 = vm.NewConnectionCommand.Subscribe(_ => (EditConnection() | @catch(LogError("new connection"))).RunIgnore())
         select (PageModelBase)vm;
 
     Func<Change<TunnelConfig>, Eff<Unit>> ListenStorageChange(ConnectionSelectionViewModel vm) =>
@@ -47,15 +46,15 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
                   }
                 | @catch(LogError("listening storage changes"));
 
-    Eff<ConnectionInfoPanelViewModel> CreateInfoVm(TunnelConfig config) =>
+    Eff<ConnectionInfoPanelViewModel> CreateInfoVm(TunnelConfig config, bool initialPlaying = default) =>
         from vm in SuccessEff(new ConnectionInfoPanelViewModel(config))
         from _1 in vm.Edit.SubscribeEff(c => EditConnection(c) | @catch(LogError("editing connection")))
         from _2 in vm.PlayOrStop.SubscribeEff(isPlaying => logger.LogResult(isPlaying ? Stop(vm) : Play(vm))
                                                          | @catch(LogError("play or stop")))
         let isPlaying = sshManager.TunnelRunningStateChanges
-                                  .Where(state => state.TunnelId == vm.Config.Id!.Value)
+                                  .Where(state => state.Config.Id == vm.Config.Id)
                                   .Select(state => state.IsRunning)
-                                  .StartWith(false)
+                                  .StartWith(initialPlaying)
         from _3 in vm.SetIsPlaying(isPlaying)
         select vm;
 
