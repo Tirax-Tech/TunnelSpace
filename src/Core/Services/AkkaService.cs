@@ -2,6 +2,7 @@
 using Akka.Actor.Setup;
 using Akka.Configuration;
 using Akka.DependencyInjection;
+using Serilog;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Services.Akka;
 
@@ -30,12 +31,15 @@ akka.actor.ask-timeout = 10s
         select system;
 
     public AkkaService(IServiceProvider sp) {
-        var sys = (from system in InitSystem(sp)
+        var sys = (from logger in sp.GetRequiredServiceEff<ILogger>()
+                   from system in InitSystem(sp)
                    from manager in system.CreateActor<SshManagerActor>("ssh-manager")
-                   from ___ in eff(() => {
-                                       System = system;
-                                       SshManager = new(manager);
-                                   })
+                   from uniqueId in sp.GetRequiredServiceEff<IUniqueId>()
+                   from _1 in eff(() => {
+                                      System = system;
+                                      SshManager = new(uniqueId, manager);
+                                  })
+                   from _2 in logger.InformationEff("Akka initialized")
                    select system).Memo();
 
         Init = sys.Map(_ => unit);
@@ -47,5 +51,5 @@ akka.actor.ask-timeout = 10s
     public Aff<Unit> Shutdown { get; }
 
     public ActorSystem System { get; private set; } = default!;
-    public SshManager SshManager { get; private set; } = new(ActorRefs.Nobody);
+    public SshManager SshManager { get; private set; } = default!;
 }

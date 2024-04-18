@@ -1,10 +1,15 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using ReactiveUI;
 
 namespace Tirax.TunnelSpace.EffHelpers;
 
 public static class IObservableEff
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Eff<IDisposable> SubscribeEff<T>(this IObservable<T> observable, IObserver<T> observer) =>
+        Eff(() => observable.Subscribe(observer));
+
     public static Eff<IDisposable> SubscribeEff<T>(this IObservable<T> observable, Func<T,Eff<Unit>> handler) =>
         Eff(() => observable.Subscribe(x => handler(x).RunUnit()));
 

@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Reactive.Linq;
+using System.Runtime.CompilerServices;
 using Serilog;
 using Tirax.TunnelSpace.Domain;
 using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Features.TunnelConfigPage;
-using Tirax.TunnelSpace.Services;
 using Tirax.TunnelSpace.Services.Akka;
 using Tirax.TunnelSpace.ViewModels;
 
@@ -47,6 +48,11 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         from vm in SuccessEff(new ConnectionInfoPanelViewModel(config))
         from _1 in vm.Edit.SubscribeEff(c => EditConnection(c).ToBackground())
         from _2 in vm.PlayOrStop.SubscribeEff(isPlaying => logger.LogResult(isPlaying? Stop(vm) : Play(vm)).ToBackground())
+        let isPlaying = sshManager.TunnelRunningStateChanges
+                                  .Where(state => state.TunnelId == vm.Config.Id!.Value)
+                                  .Select(state => state.IsRunning)
+                                  .StartWith(false)
+        from _3 in vm.SetIsPlaying(isPlaying)
         select vm;
 
     Aff<Unit> EditConnection(Option<TunnelConfig> config = default) =>
@@ -69,16 +75,13 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         from _2 in mainWindow.CloseCurrentView
         select unit;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     Aff<Unit> Play(ConnectionInfoPanelViewModel vm) =>
-        from _1 in sshManager.StartTunnel(vm.Config.Id!.Value)
-        from _ in Eff(() => vm.SetIsPlaying(state))
-        select unit;
+        sshManager.StartTunnel(vm.Config.Id!.Value);
 
-    static Eff<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
-        from controller in Eff(() => vm.Controller.Get())
-        from _1 in eff(controller.Dispose)
-        from _2 in Eff(vm.Stop)
-        select unit;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    Aff<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
+        sshManager.StopTunnel(vm.Config.Id!.Value);
 
 
 }

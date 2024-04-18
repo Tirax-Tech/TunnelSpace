@@ -17,7 +17,7 @@ public static class ActorEff
         DependencyResolver.For(sys).Props<T>(parameters);
 
     public static Aff<T> AskEff<T>(this ICanTell target, object message) =>
-        Aff(() => target.Ask<T>(message).ToValue());
+        Aff(async () => await target.Ask<T>(message));
 
     public static Eff<IActorRef> CreateActor<T>(this ActorSystem context, string name, params object[] parameters) where T : ActorBase =>
         Eff(() => context.ActorOf(context.DependencyProps<T>(parameters), name));
