@@ -85,31 +85,12 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
     protected override Eff<Unit> OnReceiveEff(object message) =>
         message switch
         {
-            nameof(ISshManager.All) =>
-                Sender.Respond(SuccessEff(tunnels.Values.Map(t => t.Config).ToArray())),
+            nameof(ISshManager.All) => Sender.Respond(SuccessEff(tunnels.Values.Map(t => t.Config).ToArray())),
 
-            (nameof(ISshManager.DeleteTunnel), Guid tunnelId) =>
-                Sender.Respond(from _ in storage.Delete(tunnelId)
-                               select unit),
+            (nameof(ISshManager.DeleteTunnel), Guid tunnelId) => Sender.Respond(from _ in storage.Delete(tunnelId) select unit),
 
-            (nameof(ISshManager.StartTunnel), Guid tunnelId) =>
-                from __ in unitEff
-                let startTunnel =
-                    from tunnel in tunnels.GetEff(tunnelId)
-                    let config = tunnel.Config
-                    let createNewActor = from actor in Context.CreateActor<SshController>($"ssh-connection-{config.Id}", config)
-                                         from _1 in tunnels.Set(tunnelId, tunnel with { Controller = Some(actor) })
-                                         select actor
-                    from actor in tunnel.Controller.ToEff() | createNewActor
-                    let controller = new SshControllerWrapper(actor)
-                    from playState in controller.Start
-                    from _2 in eff(() => playState.Subscribe(isPlaying =>
-                                                                 tunnelRunningStateChanges.OnNext(new TunnelState(tunnelId, isPlaying))
-                                                            ))
-                    select unit
-                from _1 in Sender.Respond(startTunnel
-                                        | @catch(AppStandardErrors.NotFound, AppStandardErrors.NotFoundFromKey(tunnelId.ToString())))
-                select unit,
+            (nameof(ISshManager.StartTunnel), Guid tunnelId) => StartTunnel(tunnelId),
+            (nameof(ISshManager.StopTunnel), Guid tunnelId) => StopTunnel(tunnelId),
 
             ObservableBridge.SubscribeObservable<Change<TunnelConfig>> m => m.Apply(changes, observableDisposables),
             ObservableBridge.SubscribeObservable<TunnelState> m          => m.Apply(tunnelRunningStateChanges, observableDisposables),
@@ -117,6 +98,37 @@ public sealed class SshManagerActor : UntypedActorEff, IWithUnboundedStash
 
             _ => UnhandledEff(message)
         };
+
+    Eff<Unit> StartTunnel(Guid tunnelId) =>
+        from __ in unitEff
+        let startTunnel =
+            from tunnel in tunnels.GetEff(tunnelId)
+            let config = tunnel.Config
+            let createNewActor = from actor in Context.CreateActor<SshController>($"ssh-connection-{config.Id}", config)
+                                 from _1 in tunnels.Set(tunnelId, tunnel with { Controller = Some(actor) })
+                                 select actor
+            from actor in tunnel.Controller.ToEff() | createNewActor
+            let controller = new SshControllerWrapper(actor)
+            from playState in controller.Start
+            from _2 in eff(() => playState.Subscribe(isPlaying => tunnelRunningStateChanges.OnNext(new TunnelState(tunnelId, isPlaying))))
+            select unit
+        from _1 in Sender.Respond(startTunnel
+                                | @catch(AppStandardErrors.NotFound, AppStandardErrors.NotFoundFromKey(tunnelId.ToString())))
+        select unit;
+
+    Eff<Unit> StopTunnel(Guid tunnelId) =>
+        from __ in unitEff
+        let stopTunnel =
+            from tunnel in tunnels.GetEff(tunnelId)
+            from actor in tunnel.Controller.ToEff()
+                        | FailEff<IActorRef>(AppStandardErrors.Unexpected($"Controller for {tunnelId} has not been started"))
+            let controller = new SshControllerWrapper(actor)
+            from _1 in controller.DisposeEff()
+            from _2 in tunnels.Set(tunnelId, tunnel with { Controller = None })
+            select unit
+        from _1 in Sender.Respond(stopTunnel
+                                | @catch(AppStandardErrors.NotFound, AppStandardErrors.NotFoundFromKey(tunnelId.ToString())))
+        select unit;
 
     // TODO: move this into SshController
     protected override void PostStop() {
