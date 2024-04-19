@@ -21,11 +21,12 @@ public static class IObservableEff
         from _2 in eff(() => caller.Iter(sender.RaisePropertyChanged))
         select result;
 
-    public static Eff<T> ChangeProperty<T>(this IReactiveObject sender, string caller, Eff<T> viewSetter) =>
-        from _1 in eff(() => sender.RaisePropertyChanging(caller))
-        from result in viewSetter
-        from _2 in eff(() => sender.RaisePropertyChanged(caller))
-        select result;
+    public static T ChangeProperty<T>(this IReactiveObject sender, string caller, Func<T> viewSetter) {
+        sender.RaisePropertyChanging(caller);
+        var result = viewSetter();
+        sender.RaisePropertyChanged(caller);
+        return result;
+    }
 
     public static Eff<Unit> OnNextEff<T>(this IObserver<T> observer, T value) =>
         eff(() => observer.OnNext(value));

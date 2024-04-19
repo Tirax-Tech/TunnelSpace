@@ -36,7 +36,7 @@ public static class PreludeX
         Try(handler).ToEither(Error.New);
 
     [MethodImpl(MethodImplOptions.NoOptimization)]
-    public static void Void<T>(T v) { }
+    public static Unit Void<T>(T v) => unit;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Unit ToUnit(Action action) {

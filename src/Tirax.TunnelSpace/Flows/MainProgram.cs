@@ -16,23 +16,15 @@ public interface IMainProgram
     EitherAsync<Error, Unit> Start();
 }
 
-public sealed class MainProgram : IMainProgram
+public sealed class MainProgram(IAppMainWindow vm, IConnectionSelectionFlow flowConnectionSelection) : IMainProgram
 {
-    readonly IAppMainWindow vm;
-    readonly IConnectionSelectionFlow flowConnectionSelection;
-
-    public MainProgram(IAppMainWindow vm, IConnectionSelectionFlow flowConnectionSelection) {
-        this.vm = vm;
-        this.flowConnectionSelection = flowConnectionSelection;
-    }
-
     public EitherAsync<Error, Unit> Start() {
-        var sidebar = Seq<SidebarItem>(("Home", Aff(async () => (await flowConnectionSelection.Create()).ToAff(identity)).Bind(identity)),
-                                       ("Import/Export", Eff(() => (PageModelBase)new ImportExportViewModel())));
-        vm.SetSidebar(sidebar).RunUnit();
+        var sidebar = Seq<SidebarItem>(("Home", flowConnectionSelection.Create),
+                                       ("Import/Export", () => new ImportExportViewModel()));
+        vm.SetSidebar(sidebar);
 
-         return from model in flowConnectionSelection.Create()
-                let ____1 = vm.Reset(model).RunUnit()
-                select unit;
+        return from model in flowConnectionSelection.Create()
+               let _ = vm.Reset(model)
+               select unit;
     }
 }
