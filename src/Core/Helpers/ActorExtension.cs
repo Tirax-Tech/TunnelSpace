@@ -1,8 +1,11 @@
 ﻿using System.Runtime.CompilerServices;
 using Akka.Actor;
 using Akka.DependencyInjection;
+using Akka.Dispatch;
+using CS = Akka.Actor.CoordinatedShutdown;
+// ReSharper disable CheckNamespace
 
-namespace RZ.Foundation;
+namespace RZ.Foundation.Akka;
 
 public static class ActorExtension
 {
@@ -10,11 +13,29 @@ public static class ActorExtension
     static Props DependencyProps<T>(this ActorSystem sys, params object[] parameters) where T : ActorBase =>
         DependencyResolver.For(sys).Props<T>(parameters);
 
-    // public static IActorRef CreateActor<T>(this ActorSystem sys, string name, params object[] parameters) where T : ActorBase =>
-    //     sys.ActorOf(sys.DependencyProps<T>(parameters), name);
-    //
-    // public static IActorRef CreateActor<T>(this IUntypedActorContext context, string name, params object[] parameters) where T : ActorBase =>
-    //     context.ActorOf(context.System.DependencyProps<T>(parameters), name);
+    public static Task<Unit> CoordinatedShutdown(this ActorSystem system, Option<CS.Reason> reason = default) =>
+        Task.Run(async () => {
+                     await CS.Get(system).Run(reason.IfNone(CS.ClrExitReason.Instance));
+                     return unit;
+                 });
+
+    public static IActorRef CreateActor<T>(this ActorSystem sys, string name, params object[] parameters) where T : ActorBase =>
+        sys.ActorOf(sys.DependencyProps<T>(parameters), name);
+
+    public static IActorRef CreateActor<T>(this IUntypedActorContext context, string name, params object[] parameters) where T : ActorBase =>
+        context.ActorOf(context.System.DependencyProps<T>(parameters), name);
+
+    public static Unit Respond<T>(this ICanTell target, OutcomeAsync<T> message,
+                                  Option<Func<Error, Exception>> errorMapper = default,
+                                  Option<IActorRef> sender = default) where T: notnull {
+        ActorTaskScheduler.RunTask(async () => {
+                                       var data = (await message).IfSuccess(out var v, out var e)
+                                                      ? (object)v
+                                                      : errorMapper.Apply(e).IfNone(e.ToException);
+                                       target.TellUnit(data, sender.ToNullable());
+                                   });
+        return unit;
+    }
 
     /// <summary>
     /// Nicely wrap the actor's ask pattern into EitherAsync&lt;ErrorInfo,T&gt;.
@@ -23,10 +44,10 @@ public static class ActorExtension
     /// <param name="message">A query message</param>
     /// <typeparam name="T">A success type</typeparam>
     /// <returns></returns>
-    public static EitherAsync<Error,T> SafeAsk<T>(this ICanTell actor, object message) =>
-        TryCatch(() => actor.Ask<Either<Error, T>>(message));
+    public static OutcomeAsync<T> SafeAsk<T>(this ICanTell actor, object message) =>
+        TryCatch(() => actor.Ask<Outcome<T>>(message));
 
-    public static Unit TellEx(this ICanTell target, object message, IActorRef? sender = null) {
+    public static Unit TellUnit(this ICanTell target, object message, IActorRef? sender = null) {
         target.Tell(message, sender ?? ActorRefs.NoSender);
         return unit;
     }

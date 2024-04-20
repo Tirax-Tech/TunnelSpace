@@ -2,8 +2,9 @@
 using Akka.Actor.Setup;
 using Akka.Configuration;
 using Akka.DependencyInjection;
+using RZ.Foundation.Akka;
 using Serilog;
-using Tirax.TunnelSpace.EffHelpers;
+using Tirax.TunnelSpace.Helpers;
 using Tirax.TunnelSpace.Services.Akka;
 
 namespace Tirax.TunnelSpace.Services;
@@ -14,42 +15,36 @@ public interface IAkka
 
     SshManager SshManager { get; }
 
-    Aff<Unit> Init { get; }
-    Aff<Unit> Shutdown { get; }
+    Outcome<Unit>      Init();
+    OutcomeAsync<Unit> Shutdown();
 }
 
-public sealed class AkkaService : IAkka
+public sealed class AkkaService(ILogger logger, IUniqueId uniqueId, IServiceProvider sp) : IAkka
 {
     const string ConfigHocon = @"
 akka.actor.ask-timeout = 10s
 ";
-    static Eff<ActorSystem> InitSystem(IServiceProvider sp) =>
-        from config in Eff(() => BootstrapSetup.Create().WithConfig(ConfigurationFactory.ParseString(ConfigHocon)))
-        let diSetup = DependencyResolverSetup.Create(sp)
-        let setup = ActorSystemSetup.Create(config, diSetup)
-        let system = ActorSystem.Create("TiraxTunnelSpace", setup)
-        select system;
 
-    public AkkaService(IServiceProvider sp) {
-        var sys = (from logger in sp.GetRequiredServiceEff<ILogger>()
-                   from system in InitSystem(sp)
-                   from manager in system.CreateActor<SshManagerActor>("ssh-manager")
-                   from uniqueId in sp.GetRequiredServiceEff<IUniqueId>()
-                   from _1 in eff(() => {
-                                      System = system;
-                                      SshManager = new(uniqueId, manager);
-                                  })
-                   from _2 in logger.InformationEff("Akka initialized")
-                   select system).Memo();
+    readonly Lazy<ActorSystem> sys = new(() => InitSystem(sp));
+    SshManager? sshManager;
 
-        Init = sys.Map(_ => unit);
+    public ActorSystem System => sys.Value;
+    public SshManager SshManager => sshManager ?? throw new InvalidOperationException("Akka not initialized");
 
-        Shutdown = sys.Bind(akka => akka.CoordinatedShutdown());
+    public Outcome<Unit> Init() {
+        var manager = System.CreateActor<SshManagerActor>("ssh-manager");
+        sshManager = new(uniqueId, manager);
+        logger.Information("Akka initialized");
+        return unit;
     }
 
-    public Aff<Unit> Init { get; }
-    public Aff<Unit> Shutdown { get; }
+    public OutcomeAsync<Unit> Shutdown() =>
+        TryAsync(async () => await System.CoordinatedShutdown()).ToOutcome();
 
-    public ActorSystem System { get; private set; } = default!;
-    public SshManager SshManager { get; private set; } = default!;
+    static ActorSystem InitSystem(IServiceProvider sp) {
+        var config = BootstrapSetup.Create().WithConfig(ConfigurationFactory.ParseString(ConfigHocon));
+        var diSetup = DependencyResolverSetup.Create(sp);
+        var setup = ActorSystemSetup.Create(config, diSetup);
+        return ActorSystem.Create("TiraxTunnelSpace", setup);
+    }
 }

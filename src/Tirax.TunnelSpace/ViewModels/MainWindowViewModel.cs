@@ -6,24 +6,22 @@ using System.Runtime.CompilerServices;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using ReactiveUI;
-using Tirax.TunnelSpace.EffHelpers;
+using Tirax.TunnelSpace.Helpers;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public readonly record struct SidebarItem(string Name, Func<EitherAsync<Error,PageModelBase>> GetPage)
+public readonly record struct SidebarItem(string Name, Func<OutcomeAsync<PageModelBase>> GetPage)
 {
-    public static implicit operator SidebarItem((string Name, Func<EitherAsync<Error, PageModelBase>> GetPage) tuple) =>
+    public static implicit operator SidebarItem((string Name, Func<OutcomeAsync<PageModelBase>> GetPage) tuple) =>
         new(tuple.Name, tuple.GetPage);
 }
 
 public interface IAppMainWindow
 {
-    Aff<Unit> CloseCurrentView { get; }
-    Aff<Unit> PushView(PageModelBase replacement);
-    Aff<Unit> Replace(PageModelBase replacement);
+    Unit      CloseCurrentView();
+    Unit      PushView(PageModelBase replacement);
     Unit      Reset(PageModelBase replacement);
 
-    Eff<Unit> SetSidebarEff(Seq<SidebarItem> items);
     Unit SetSidebar(Seq<SidebarItem> items);
 }
 
@@ -46,12 +44,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
     const string AppHeader = "Tunnel Space";
     static readonly string AppTitle = $"Tirax Tunnel Space {AppVersion}";
 
-    static readonly Seq<string> ViewChangeProperties = Seq(nameof(CurrentViewModel), nameof(Header));
-
     public MainWindowViewModel() {
-        RefreshHeader = UiEff(() => Header = GetViewHeader(history.Peek())).Ignore();
-        CloseCurrentView = ChangeViewEff(Eff(history.Pop).Ignore());
-
         history.Push(new LoadingScreenViewModel());
         header = CreateTitleText(AppHeader);
 
@@ -59,10 +52,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
                        .Select(_ => history.Count == 1)
                        .ToProperty(this, x => x.ShowMenu);
 
-        BackCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ => await CloseCurrentView.RunUnit());
-        GotoPageCommand = ReactiveCommand.CreateFromTask<string, Either<Error, Unit>>(async page => await SidebarItems.Find(x1 => x1.Name == page)
-                                                                                                                      .Map(x2 => x2.GetPage().Map(Reset))
-                                                                                                                      .IfNone(unit));
+        BackCommand = ReactiveCommand.Create<Unit, Unit>(_ => CloseCurrentView());
+        GotoPageCommand = ReactiveCommand.CreateFromTask<string, Outcome<Unit>>
+            (async page => await SidebarItems.Find(x1 => x1.Name == page)
+                                             .Map(x2 => x2.GetPage().Map(Reset))
+                                             .IfNone(unit));
     }
 
     static TextBlock CreateTitleText(string text) =>
@@ -89,18 +83,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 
     public bool ShowMenu => showMenu.Value;
 
-    Aff<Unit> RefreshHeader { get; }
+    Unit RefreshHeader() {
+        Header = GetViewHeader(history.Peek());
+        return unit;
+    }
 
-    Aff<Unit> ChangeViewEff(Eff<Unit> change) =>
-        from _1 in this.ChangeProperties(ViewChangeProperties, change)
-        from _2 in RefreshHeader
-        select unit;
-
-    Eff<Unit> PushViewEff(PageModelBase view) =>
-        eff(() => history.Push(view));
-
-    public Aff<Unit> PushView(PageModelBase view) =>
-        ChangeViewEff(PushViewEff(view));
+    public Unit PushView(PageModelBase view) =>
+        ChangeView(() => {
+                       history.Push(view);
+                       return unit;
+                   });
 
     static object GetViewHeader(PageModelBase view) =>
         view.Header switch
@@ -110,17 +102,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
             _        => view.Header
         };
 
-    public Aff<Unit> CloseCurrentView { get; }
-
-    public Aff<Unit> Replace(PageModelBase replacement) =>
-        ChangeViewEff(from _1 in Eff(history.Pop)
-                   from _2 in PushViewEff(replacement)
-                   select unit);
-
-    public Aff<Unit> ResetEff(PageModelBase replacement) =>
-        ChangeViewEff(from _1 in eff(history.Clear)
-                   from _2 in PushViewEff(replacement)
-                   select unit);
+    public Unit CloseCurrentView() =>
+        ChangeView(ToUnit(history.Pop));
 
     public Unit Reset(PageModelBase replacement) =>
         ChangeView(() => {
@@ -130,8 +113,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
                    });
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    Unit ChangeView(Func<Unit> change) =>
+    Unit ChangeView(Func<Unit> change) {
         this.ChangeProperty(nameof(CurrentViewModel), change);
+        return RefreshHeader();
+    }
 
     #endregion
 
@@ -141,13 +126,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 
     public Seq<SidebarItem> SidebarItems => sidebarItems;
 
-    public Eff<Unit> SetSidebarEff(Seq<SidebarItem> items) =>
-        eff(() => this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)));
-
     public Unit SetSidebar(Seq<SidebarItem> items) =>
-        Void(this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)));
+        ___(this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)));
 
-    public ReactiveCommand<string, Either<Error, Unit>> GotoPageCommand { get; }
+    public ReactiveCommand<string, Outcome<Unit>> GotoPageCommand { get; }
 
     #endregion
 }

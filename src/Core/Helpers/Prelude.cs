@@ -4,6 +4,11 @@ namespace RZ.Foundation;
 
 public static class PreludeX
 {
+    public static OutcomeAsync<T> TryCatch<T>(Func<Task<Outcome<T>>> handler) =>
+        from v in TryAsync(handler).ToOutcome()
+        from result in v.ToAsync()
+        select result;
+
     public static EitherAsync<Error, T> TryCatch<T>(Func<Task<Either<Error, T>>> handler) =>
         from v in TryAsync(handler).ToEither()
         from result in v.ToAsync()
@@ -14,11 +19,8 @@ public static class PreludeX
         from result in v.ToAsync()
         select result;
 
-    public static EitherAsync<Error, T> TryCatch<T>(Func<Task<T>> handler) =>
-        TryAsync(handler).ToEither();
-
-    public static EitherAsync<Error, T> TryCatch<T>(Func<ValueTask<T>> handler) =>
-        TryAsync(async () => await handler()).ToEither();
+    public static OutcomeAsync<T> TryCatch<T>(Func<Task<T>> handler) =>
+        TryAsync(handler).ToOutcome();
 
     public static EitherAsync<Error, Unit> TryCatch(Func<Task> handler) =>
         TryAsync(async () => {
@@ -32,15 +34,9 @@ public static class PreludeX
             return Unit.Default;
         }).ToEither();
 
-    public static Either<Error, T> TryCatch<T>(Func<T> handler) =>
+    public static Outcome<T> TryCatch<T>(Func<T> handler) =>
         Try(handler).ToEither(Error.New);
 
     [MethodImpl(MethodImplOptions.NoOptimization)]
-    public static Unit Void<T>(T v) => unit;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Unit ToUnit(Action action) {
-        action();
-        return unit;
-    }
+    public static Unit ___<T>(T v) => unit;
 }

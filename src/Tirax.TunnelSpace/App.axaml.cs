@@ -1,24 +1,25 @@
-using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.ViewModels;
 using Tirax.TunnelSpace.Views;
 
 namespace Tirax.TunnelSpace;
 
-sealed record AppInit(Aff<Unit> Start, Aff<Unit> Shutdown)
+interface IAppInit
 {
-    public static readonly AppInit DoNothing = new(unitAff, unitAff);
+    OutcomeAsync<Unit> Start(IAppMainWindow vm);
+    OutcomeAsync<Unit> Shutdown();
 }
 
-class App(TaskCompletionSource<Aff<Unit>> initialized, Func<IAppMainWindow, Eff<AppInit>> init) : Application
+class App(IAppInit initializer) : Application
 {
+    public static readonly IAppInit DoNothing = new DumpInit();
+
     [DesignOnly(true)]
-    public App() : this(new(), _ => SuccessEff(AppInit.DoNothing)) {}
+    public App() : this(DoNothing) { }
 
     public override void Initialize()
     {
@@ -30,13 +31,16 @@ class App(TaskCompletionSource<Aff<Unit>> initialized, Func<IAppMainWindow, Eff<
             var vm = new MainWindowViewModel();
             desktop.MainWindow = new MainWindow { DataContext = vm };
 
-            var run = from appInit in init(vm)
-                      from _1 in eff(() => initialized.SetResult(appInit.Shutdown))
-                      from _2 in appInit.Start
-                      select unit;
-            run.RunIgnore();
+            Task.Run(async () => await initializer.Start(vm));
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    sealed class DumpInit : IAppInit
+    {
+        public OutcomeAsync<Unit> Start(IAppMainWindow vm) => unit;
+
+        public OutcomeAsync<Unit> Shutdown() => unit;
     }
 }

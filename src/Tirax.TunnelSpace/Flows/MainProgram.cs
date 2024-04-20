@@ -13,12 +13,12 @@ static class AppCommands
 
 public interface IMainProgram
 {
-    EitherAsync<Error, Unit> Start();
+    OutcomeAsync<Unit> Start();
 }
 
 public sealed class MainProgram(IAppMainWindow vm, IConnectionSelectionFlow flowConnectionSelection) : IMainProgram
 {
-    public EitherAsync<Error, Unit> Start() {
+    public OutcomeAsync<Unit> Start() {
         var sidebar = Seq<SidebarItem>(("Home", flowConnectionSelection.Create),
                                        ("Import/Export", () => new ImportExportViewModel()));
         vm.SetSidebar(sidebar);

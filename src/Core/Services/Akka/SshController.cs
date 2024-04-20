@@ -2,84 +2,84 @@
 using System.Reactive.Subjects;
 using System.Runtime.CompilerServices;
 using Akka.Actor;
+using RZ.Foundation.Akka;
 using Tirax.TunnelSpace.Domain;
-using Tirax.TunnelSpace.EffHelpers;
 using Seq = LanguageExt.Seq;
 
 namespace Tirax.TunnelSpace.Services.Akka;
 
 public interface ISshController : IDisposable
 {
-    Aff<IObservable<bool>> Start { get; }
+    OutcomeAsync<IObservable<bool>> Start();
 }
 
 sealed class SshControllerWrapper(IActorRef actor) : ISshController
 {
-    public Aff<IObservable<bool>> Start { get; } =
-        actor.AskEff<IObservable<bool>>(nameof(Start));
+    public OutcomeAsync<IObservable<bool>> Start() =>
+        actor.SafeAsk<IObservable<bool>>(nameof(Start));
 
     public void Dispose() =>
         actor.Tell(nameof(Dispose));
 }
 
-public sealed class SshController(TunnelConfig config) : UntypedActor
+public sealed class SshController(TunnelConfig config) : UntypedUnitActor
 {
     BehaviorSubject<bool> state = new(false);
     Option<Process> process;
 
     protected override void PostStop() {
-        CloseCurrentProcess().RunUnit();
+        CloseCurrentProcess();
     }
 
-    protected override void OnReceive(object message) =>
-        (message switch
-         {
-             nameof(ISshController.Start) =>
-                 Sender.Respond(from _1 in CloseCurrentProcess()
-                                from started in StartSshProcess(config)
-                                from _2 in OnStarted(started)
-                                select state),
+    protected override Unit HandleReceive(object message) =>
+        message switch
+        {
+            nameof(ISshController.Start) => Sender.TellUnit(Start()),
+            nameof(IDisposable.Dispose)  => Dispose(),
 
-             nameof(IDisposable.Dispose) =>
-                 from _1 in CloseCurrentProcess()
-                 from _2 in eff(() => Self.Tell(PoisonPill.Instance))
-                 select unit,
+            "CheckProcess" => process.Iter(p => p.Refresh()),
 
-             "CheckProcess" => eff(() => process.Iter(p => p.Refresh())),
+            _ => Unhandled(message)
+        };
 
-             _ => unitEff
-         }
-        ).RunUnit();
+    IObservable<bool> Start() {
+        CloseCurrentProcess();
+        process = StartSshProcess(config);
+        process.Iter(p => {
+                         p.EnableRaisingEvents = true;
+                         p.Exited += (_, _) => CloseCurrentProcess();
+                     });
+        state.OnNext(process.IsSome);
+        return state;
+    }
 
-    static Eff<Process> StartSshProcess(TunnelConfig config) {
-        var portParameters = IsPortUnspecified(config.Port)? Seq.empty<string>() : Seq("-p", config.Port.ToString());
+    Unit Dispose() {
+        CloseCurrentProcess();
+        Self.Tell(PoisonPill.Instance);
+        return unit;
+    }
+
+    static Process StartSshProcess(TunnelConfig config) {
+        var portParameters = IsPortUnspecified(config.Port) ? Seq.empty<string>() : Seq("-p", config.Port.ToString());
         var processParameters = portParameters.Concat(Seq("-fN", config.Host,
                                                           "-L", $"{config.LocalPort}:{config.RemoteHost}:{config.RemotePort}"));
-        return Eff(() => Process.Start("ssh", processParameters));
+        return Process.Start("ssh", processParameters);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool IsPortUnspecified(short port) => port is 0 or 22;
 
-    Eff<Unit> OnStarted(Process p) =>
-        eff(() => {
-                process = p;
-                state.OnNext(true);
-                p.EnableRaisingEvents = true;
-                p.Exited += (_, _) => CloseCurrentProcess().RunUnit();
-            });
+    Unit CloseCurrentProcess() {
+        if (process.IfNone(out var p)) return unit;
 
-    Eff<Unit> CloseCurrentProcess() =>
-        eff(() => {
-                if (process.IfSome(out var p)) {
-                    state.OnNext(false);
-                    state.OnCompleted();
-                    state = new(false);
-                    process = None;
+        state.OnNext(false);
+        state.OnCompleted();
+        state = new(false);
+        process = None;
 
-                    using var _ = p;
-                    if (!p.HasExited)
-                        p.Kill();
-                }
-            });
+        using var _ = p;
+        if (!p.HasExited)
+            p.Kill();
+        return unit;
+    }
 }

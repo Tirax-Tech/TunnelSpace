@@ -3,8 +3,8 @@ using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using Serilog;
 using Tirax.TunnelSpace.Domain;
-using Tirax.TunnelSpace.EffHelpers;
 using Tirax.TunnelSpace.Features.TunnelConfigPage;
+using Tirax.TunnelSpace.Helpers;
 using Tirax.TunnelSpace.Services.Akka;
 using Tirax.TunnelSpace.ViewModels;
 
@@ -12,80 +12,89 @@ namespace Tirax.TunnelSpace.Flows;
 
 public interface IConnectionSelectionFlow
 {
-    EitherAsync<Error, PageModelBase> Create();
+    OutcomeAsync<PageModelBase> Create();
 }
 
 public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager,
                                             IUniqueId uniqueId) : IConnectionSelectionFlow
 {
-    public EitherAsync<Error, PageModelBase> Create() =>
-        from allData in sshManager.RetrieveState()
-        let configVms = allData.Map(i => CreateInfoVm(i.Config, i.IsRunning).Run().ThrowIfFail())
-        let vm = new ConnectionSelectionViewModel(configVms)
-        let _1 = sshManager.Changes.Subscribe(x => ListenStorageChange(vm)(x).RunUnit())
-        let _2 = vm.NewConnectionCommand.Subscribe(_ => (EditConnection() | @catch(LogError("new connection"))).RunIgnore())
-        select (PageModelBase)vm;
+    public OutcomeAsync<PageModelBase> Create() {
+        return sshManager.RetrieveState().Map(create);
 
-    Func<Change<TunnelConfig>, Eff<Unit>> ListenStorageChange(ConnectionSelectionViewModel vm) =>
-        change => change switch
-                  {
-                      EntryAdded<TunnelConfig> add =>
-                          from configVM in CreateInfoVm(add.Value)
-                          from _ in vm.TunnelConfigs.AddEff(configVM)
-                          select unit,
+        PageModelBase create(Seq<TunnelState> allData) {
+            var configVms = allData.Map(i => CreateInfoVm(i.Config, i.IsRunning));
+            var vm = new ConnectionSelectionViewModel(configVms);
+            sshManager.Changes.Subscribe(ListenStorageChange(vm));
+            vm.NewConnectionCommand.Subscribe(_ => EditConnection());
+            return vm;
+        }
+    }
 
-                      EntryMapped<TunnelConfig, TunnelConfig> update =>
-                          from configVM in CreateInfoVm(update.To)
-                          from _ in vm.TunnelConfigs.ReplaceEff(item => item.Config.Id == update.From.Id, configVM)
-                          select unit,
+    Action<Change<TunnelConfig>> ListenStorageChange(ConnectionSelectionViewModel vm) =>
+        change => {
+            switch (change) {
+                case EntryAdded<TunnelConfig> add:
+                    vm.TunnelConfigs.Add(CreateInfoVm(add.Value));
+                    break;
 
-                      EntryRemoved<TunnelConfig> delete =>
-                          vm.TunnelConfigs.RemoveEff(item => item.Config.Id == delete.OldValue.Id).Ignore(),
+                case EntryMapped<TunnelConfig, TunnelConfig> update:
+                    var result = vm.TunnelConfigs.ReplaceFirst(item => item.Config.Id == update.From.Id, CreateInfoVm(update.To));
+                    if (result.IfFail(out var e, out _))
+                        logger.Warning(e, "Cannot find {TunnelId} in the storage. Probably bug!", update.From.Id);
+                    break;
 
-                      _ => FailEff<Unit>((AppStandardErrors.UnexpectedCode, $"Unrecognized change: {change}"))
-                  }
-                | @catch(LogError("listening storage changes"));
+                case EntryRemoved<TunnelConfig> delete:
+                    vm.TunnelConfigs.Remove(item => item.Config.Id == delete.OldValue.Id);
+                    break;
 
-    Eff<ConnectionInfoPanelViewModel> CreateInfoVm(TunnelConfig config, bool initialPlaying = default) =>
-        from vm in SuccessEff(new ConnectionInfoPanelViewModel(config))
-        from _1 in vm.Edit.SubscribeEff(c => EditConnection(c) | @catch(LogError("editing connection")))
-        from _2 in vm.PlayOrStop.SubscribeEff(isPlaying => logger.LogResult(isPlaying ? Stop(vm) : Play(vm))
-                                                         | @catch(LogError("play or stop")))
-        let isPlaying = sshManager.TunnelRunningStateChanges
+                default:
+                    throw new NotSupportedException($"Change type {change.GetType()} is not supported.");
+            }
+        };
+
+    ConnectionInfoPanelViewModel CreateInfoVm(TunnelConfig config, bool initialPlaying = default) {
+        var vm = new ConnectionInfoPanelViewModel(config);
+        vm.Edit.Subscribe(c => EditConnection(c));
+        vm.PlayOrStop.SubscribeAsync(isPlaying => (isPlaying ? Stop(vm) : Play(vm))
+                                                | @catch(LogError("play or stop")));
+        var isPlaying = sshManager.TunnelRunningStateChanges
                                   .Where(state => state.Config.Id == vm.Config.Id)
                                   .Select(state => state.IsRunning)
-                                  .StartWith(initialPlaying)
-        from _3 in vm.SetIsPlaying(isPlaying)
-        select vm;
+                                  .StartWith(initialPlaying);
+        vm.SetIsPlaying(isPlaying);
+        return vm;
+    }
 
-    Aff<Unit> EditConnection(Option<TunnelConfig> config = default) =>
-        from view in SuccessEff(new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample)))
-        from _1 in view.Save.SubscribeEff(c => Update(c) | @catch(LogError("saving tunnel config")))
-        from _2 in view.Back.SubscribeEff(_ => mainWindow.CloseCurrentView | @catch(LogError("back to main view")))
-        from _3 in view.Delete.SubscribeEff(_ => (from _1 in sshManager.DeleteTunnel(view.Config.Id!.Value)
-                                                  from _2 in mainWindow.CloseCurrentView
-                                                  select unit
-                                                 ) | @catch(LogError("deleting tunnel")))
-        from _4 in mainWindow.PushView(view)
-        select unit;
+    Unit EditConnection(Option<TunnelConfig> config = default) {
+        var view = new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample));
+        view.Save.SubscribeAsync(c => Update(c) | @catch(LogError("saving tunnel config")));
+        view.Back.Subscribe(_ => mainWindow.CloseCurrentView());
+        view.Delete.SubscribeAsync(_ => Delete(view.Config.Id!.Value) | @catch(LogError("deleting tunnel")));
+        mainWindow.PushView(view);
+        return unit;
+    }
 
-    Aff<Unit> Update(TunnelConfig config) =>
-        from _1 in config.Id is null
-                       ? from id in uniqueId.NewGuid
-                         from ret in sshManager.AddTunnel(config with { Id = id })
-                         select ret
-                       : sshManager.UpdateTunnel(config)
-        from _2 in mainWindow.CloseCurrentView
-        select unit;
+    OutcomeAsync<Unit> Update(TunnelConfig config) {
+        var updated = config.Id is null
+                          ? sshManager.AddTunnel(config with { Id = uniqueId.NewGuid() })
+                          : sshManager.UpdateTunnel(config);
+        return updated | @do<Unit>(_ => mainWindow.CloseCurrentView());
+    }
+
+    OutcomeAsync<Unit> Delete(Guid id) =>
+        sshManager.DeleteTunnel(id) | @do<Unit>(_ => mainWindow.CloseCurrentView());
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    Aff<Unit> Play(ConnectionInfoPanelViewModel vm) =>
+    OutcomeAsync<Unit> Play(ConnectionInfoPanelViewModel vm) =>
         sshManager.StartTunnel(vm.Config.Id!.Value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    Aff<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
+    OutcomeAsync<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
         sshManager.StopTunnel(vm.Config.Id!.Value);
 
-    Func<Error, Eff<Unit>> LogError(string action) =>
-        e => logger.ErrorEff(e, "Error while {Action}", action);
+    Func<Error, Unit> LogError(string action) =>
+        e => {
+            logger.Error(e, "Error while {Action}", action);
+            return unit;
+        };
 }
