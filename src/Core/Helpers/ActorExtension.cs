@@ -2,6 +2,7 @@
 using Akka.Actor;
 using Akka.DependencyInjection;
 using Akka.Dispatch;
+using RZ.Foundation.Functional;
 using CS = Akka.Actor.CoordinatedShutdown;
 // ReSharper disable CheckNamespace
 
@@ -26,13 +27,15 @@ public static class ActorExtension
         context.ActorOf(context.System.DependencyProps<T>(parameters), name);
 
     public static Unit Respond<T>(this ICanTell target, OutcomeAsync<T> message,
-                                  Option<Func<Error, Exception>> errorMapper = default,
+                                  Option<Func<Error, Error>> errorMapper = default,
                                   Option<IActorRef> sender = default) where T: notnull {
         ActorTaskScheduler.RunTask(async () => {
-                                       var data = (await message).IfSuccess(out var v, out var e)
-                                                      ? (object)v
-                                                      : errorMapper.Apply(e).IfNone(e.ToException);
-                                       target.TellUnit(data, sender.ToNullable());
+                                       var result = await message;
+                                       var final = result.MapFailure(errorMapper.IfNone(identity))
+                                                 | ifError<T>(e => e.IsExceptional
+                                                                      ? e.Append(StandardErrors.StackTrace(e.ToException().StackTrace!))
+                                                                      : e);
+                                       target.TellUnit(final, sender.ToNullable() ?? ActorRefs.NoSender);
                                    });
         return unit;
     }

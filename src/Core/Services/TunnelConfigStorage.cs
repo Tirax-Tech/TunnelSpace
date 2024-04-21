@@ -31,7 +31,12 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
 
     public OutcomeAsync<Unit> Init() {
         logger.Information("Initializing storage...");
-        return from _ in use(GetStore, Load) | @do<Seq<TunnelConfig>>(SaveInMemory)
+        return from _ in use(GetStore, Load)
+                       | ifError(AppErrors.InvalidData, e => {
+                                                           logger.Error(e, "Data corrupted! Use new storage");
+                                                           return Seq.empty<TunnelConfig>();
+                                                       })
+                       | @do<Seq<TunnelConfig>>(SaveInMemory)
                select unit;
 
         Unit SaveInMemory(Seq<TunnelConfig> configs) {
@@ -83,11 +88,11 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
         select ret;
 
     OutcomeAsync<Seq<TunnelConfig>> Load(Stream dataFile) =>
-        from reader in SuccessOutcome(new StreamReader(dataFile, leaveOpen: true))
-        from data in use(reader, r => TryCatch(async () => {
-                                              var d = await r.ReadToEndAsync();
-                                              return string.IsNullOrEmpty(d) ? Seq.empty<TunnelConfig>() : DeserializeFromOldFormat(d);
-                                          }))
+        from reader in SuccessOutcome(new StreamReader(dataFile))
+        from data in TryCatch(async () => {
+                                  var d = await reader.ReadToEndAsync();
+                                  return string.IsNullOrEmpty(d) ? Seq.empty<TunnelConfig>() : DeserializeFromOldFormat(d);
+                              })
         select data;
 
     Outcome<Seq<TunnelConfig>> DeserializeFromOldFormat(string data) =>
@@ -99,7 +104,8 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
         select sanitized;
 
     static Outcome<Seq<TunnelConfig>> TryDeserialize(string data) =>
-        TryCatch(() => JsonSerializer.Deserialize<TunnelConfig[]>(data).ToSeq());
+        TryCatch(() => JsonSerializer.Deserialize<TunnelConfig[]>(data).ToSeq())
+           .Catch(e => AppErrors.InvalidData.WithMessage($"Cannot deserialize data:\n\nError: {e.Message}\n\nData:\n{data}"));
 
     OutcomeAsync<Unit> Save(IsolatedStorageFile store) =>
         from file in OpenFile(store, FileMode.Create)
@@ -108,7 +114,7 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
 
     OutcomeAsync<Unit> Save(Stream dataFile) =>
         TryCatch(async () => {
-                     await using var writer = new StreamWriter(dataFile, leaveOpen: true);
+                     var writer = new StreamWriter(dataFile);
                      if (TrySerialize(inMemoryStorage.Values.ToSeq()).IfFail(out var error, out var data))
                          return FailedOutcome<Unit>(error);
 

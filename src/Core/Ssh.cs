@@ -7,10 +7,7 @@ public static class Ssh
 {
     const string SshAgentProcessName = "ssh-agent";
 
-    public static Unit Initialize(ILogger logger) =>
-        StartSshIfNeeded(logger);
-
-    static Unit StartSshIfNeeded(ILogger logger) {
+    public static Unit Initialize(ILogger logger) {
         if (GetRunningSshAgents())
             logger.Information("Agent is already running");
         else {

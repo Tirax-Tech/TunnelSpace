@@ -56,7 +56,7 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         var vm = new ConnectionInfoPanelViewModel(config);
         vm.Edit.Subscribe(c => EditConnection(c));
         vm.PlayOrStop.SubscribeAsync(isPlaying => (isPlaying ? Stop(vm) : Play(vm))
-                                                | @catch(LogError("play or stop")));
+                                                | ifError(LogError("play or stop")));
         var isPlaying = sshManager.TunnelRunningStateChanges
                                   .Where(state => state.Config.Id == vm.Config.Id)
                                   .Select(state => state.IsRunning)
@@ -67,9 +67,9 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
 
     Unit EditConnection(Option<TunnelConfig> config = default) {
         var view = new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample));
-        view.Save.SubscribeAsync(c => Update(c) | @catch(LogError("saving tunnel config")));
+        view.Save.SubscribeAsync(c => Update(c) | ifError(LogError("saving tunnel config")));
         view.Back.Subscribe(_ => mainWindow.CloseCurrentView());
-        view.Delete.SubscribeAsync(_ => Delete(view.Config.Id!.Value) | @catch(LogError("deleting tunnel")));
+        view.Delete.SubscribeAsync(_ => Delete(view.Config.Id!.Value) | ifError(LogError("deleting tunnel")));
         mainWindow.PushView(view);
         return unit;
     }

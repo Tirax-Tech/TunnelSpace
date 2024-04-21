@@ -27,9 +27,8 @@ public sealed class SshController(TunnelConfig config) : UntypedUnitActor
     BehaviorSubject<bool> state = new(false);
     Option<Process> process;
 
-    protected override void PostStop() {
+    protected override Unit OnPostStop() =>
         CloseCurrentProcess();
-    }
 
     protected override Unit HandleReceive(object message) =>
         message switch
@@ -42,7 +41,7 @@ public sealed class SshController(TunnelConfig config) : UntypedUnitActor
             _ => Unhandled(message)
         };
 
-    IObservable<bool> Start() {
+    Outcome<IObservable<bool>> Start() {
         CloseCurrentProcess();
         process = StartSshProcess(config);
         process.Iter(p => {
