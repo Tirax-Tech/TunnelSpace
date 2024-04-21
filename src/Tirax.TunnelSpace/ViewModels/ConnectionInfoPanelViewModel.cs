@@ -37,11 +37,10 @@ public class ConnectionInfoPanelViewModel : ViewModelBase
     public ReactiveCommand<Unit,bool> PlayOrStop { get; }
     public ReactiveCommand<TunnelConfig, TunnelConfig> Edit { get; } = AppCommands.CreateEdit();
 
-    public Eff<Unit> SetIsPlaying(IObservable<bool> state) =>
-        Eff(() => {
-                this.RaisePropertyChanging(nameof(IsPlaying));
-                isPlaying = state.ToProperty(this, x => x.IsPlaying);
-                this.RaisePropertyChanged(nameof(IsPlaying));
-                return unit;
-            });
+    public Unit SetIsPlaying(IObservable<bool> state) {
+        this.RaisePropertyChanging(nameof(IsPlaying));
+        isPlaying = state.ToProperty(this, x => x.IsPlaying);
+        this.RaisePropertyChanged(nameof(IsPlaying));
+        return unit;
+    }
 }
