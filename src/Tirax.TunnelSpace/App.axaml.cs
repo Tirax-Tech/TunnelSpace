@@ -10,8 +10,8 @@ namespace Tirax.TunnelSpace;
 
 interface IAppInit
 {
-    OutcomeAsync<Unit> Start(IAppMainWindow vm);
-    OutcomeAsync<Unit> Shutdown();
+    Aff<Unit> Start(IAppMainWindow vm);
+    Aff<Unit> Shutdown();
 }
 
 class App(IAppInit initializer) : Application
@@ -31,7 +31,7 @@ class App(IAppInit initializer) : Application
             var vm = new MainWindowViewModel();
             desktop.MainWindow = new MainWindow { DataContext = vm };
 
-            Task.Run(async () => await initializer.Start(vm));
+            Task.Run(async () => await initializer.Start(vm).RunUnit());
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -39,8 +39,8 @@ class App(IAppInit initializer) : Application
 
     sealed class DumpInit : IAppInit
     {
-        public OutcomeAsync<Unit> Start(IAppMainWindow vm) => unit;
+        public Aff<Unit> Start(IAppMainWindow vm) => unitAff;
 
-        public OutcomeAsync<Unit> Shutdown() => unit;
+        public Aff<Unit> Shutdown() => unitAff;
     }
 }

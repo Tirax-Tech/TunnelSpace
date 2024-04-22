@@ -12,12 +12,12 @@ namespace Tirax.TunnelSpace.Services;
 
 public interface ITunnelConfigStorage
 {
-    OutcomeAsync<Unit> Init();
+    Aff<Unit> Init();
 
-    OutcomeAsync<Seq<TunnelConfig>> All();
-    OutcomeAsync<TunnelConfig>      Add(TunnelConfig config);
-    OutcomeAsync<TunnelConfig>      Update(TunnelConfig config);
-    OutcomeAsync<TunnelConfig>      Delete(Guid configId);
+    Aff<Seq<TunnelConfig>> All();
+    Aff<TunnelConfig>      Add(TunnelConfig config);
+    Aff<TunnelConfig>      Update(TunnelConfig config);
+    Aff<TunnelConfig>      Delete(Guid configId);
 
     IObservable<Change<TunnelConfig>> Changes { get; }
 }
@@ -29,14 +29,14 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
 
     public IObservable<Change<TunnelConfig>> Changes => changes;
 
-    public OutcomeAsync<Unit> Init() {
-        logger.Information("Initializing storage...");
-        return from _ in use(GetStore, Load)
-                       | ifFail(AppErrors.InvalidData, e => {
-                                                           logger.Error(e, "Data corrupted! Use new storage");
-                                                           return Seq.empty<TunnelConfig>();
-                                                       })
-                       | @do<Seq<TunnelConfig>>(SaveInMemory)
+    public Aff<Unit> Init() {
+        return from _1 in eff(() => logger.Information("Initializing storage..."))
+               from data in use(GetStore, Load)
+                          | @catch(AppErrors.InvalidData, e => {
+                                                              logger.Error(e, "Data corrupted! Use new storage");
+                                                              return Seq.empty<TunnelConfig>();
+                                                          })
+               let _ = SaveInMemory(data)
                select unit;
 
         Unit SaveInMemory(Seq<TunnelConfig> configs) {
@@ -47,13 +47,13 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
         }
     }
 
-    public OutcomeAsync<Seq<TunnelConfig>> All() =>
-        inMemoryStorage.Values.ToSeq();
+    public Aff<Seq<TunnelConfig>> All() =>
+        SuccessAff(inMemoryStorage.Values.ToSeq());
 
-    public OutcomeAsync<TunnelConfig> Add(TunnelConfig config) =>
+    public Aff<TunnelConfig> Add(TunnelConfig config) =>
         Update(config);
 
-    public OutcomeAsync<TunnelConfig> Update(TunnelConfig config) =>
+    public Aff<TunnelConfig> Update(TunnelConfig config) =>
         ChangeState(() => {
                         var existed = inMemoryStorage.Get(config.Id!.Value);
                         inMemoryStorage[config.Id!.Value] = config;
@@ -63,39 +63,38 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
                         return config;
                     });
 
-    public OutcomeAsync<TunnelConfig> Delete(Guid configId) =>
+    public Aff<TunnelConfig> Delete(Guid configId) =>
         ChangeState(() => {
                         var existed = inMemoryStorage.Remove(configId, out var v) ? Some(v) : None;
                         existed.Iter(item => changes.OnNext(Change<TunnelConfig>.Removed(item)));
-                        return existed.ToOutcome(StandardErrors.NotFoundFromKey(configId.ToString()));
+                        return existed.ToEff(StandardErrors.NotFoundFromKey(configId.ToString()));
                     });
 
-    OutcomeAsync<T> ChangeState<T>(Func<Outcome<T>> action) =>
+    Aff<T> ChangeState<T>(Func<Eff<T>> action) =>
         from result in action()
         from _ in use(GetStore, Save)
         select result;
 
-    OutcomeAsync<T> ChangeState<T>(Func<T> action) =>
-        from result in TryCatch(action)
+    Aff<T> ChangeState<T>(Func<T> action) =>
+        from result in Eff(action)
         from _ in use(GetStore, Save)
         select result;
 
-    static IsolatedStorageFile GetStore() => IsolatedStorageFile.GetUserStoreForApplication();
+    static readonly Eff<IsolatedStorageFile> GetStore = Eff(IsolatedStorageFile.GetUserStoreForApplication);
 
-    OutcomeAsync<Seq<TunnelConfig>> Load(IsolatedStorageFile store) =>
-        from file in OpenFile(store, FileMode.OpenOrCreate)
-        from ret in use(file, Load)
+    Aff<Seq<TunnelConfig>> Load(IsolatedStorageFile store) =>
+        from file in SuccessEff(OpenFile(store, FileMode.OpenOrCreate))
+        from ret in use(file, Load) | @catch(StandardErrors.NotFound, Seq.empty<TunnelConfig>())
         select ret;
 
-    OutcomeAsync<Seq<TunnelConfig>> Load(Stream dataFile) =>
-        from reader in SuccessOutcome(new StreamReader(dataFile))
-        from data in TryCatch(async () => {
-                                  var d = await reader.ReadToEndAsync();
-                                  return string.IsNullOrEmpty(d) ? Seq.empty<TunnelConfig>() : DeserializeFromOldFormat(d);
-                              })
+    Aff<Seq<TunnelConfig>> Load(Stream dataFile) =>
+        from reader in SuccessEff(new StreamReader(dataFile))
+        from content in Aff(async () => await reader.ReadToEndAsync())
+        from ____ in guardnot(string.IsNullOrEmpty(content), StandardErrors.NotFound)
+        from data in DeserializeFromOldFormat(content)
         select data;
 
-    Outcome<Seq<TunnelConfig>> DeserializeFromOldFormat(string data) =>
+    Eff<Seq<TunnelConfig>> DeserializeFromOldFormat(string data) =>
         from configs in TryDeserialize(data)
         let sanitized = from config in configs
                         select config.Id == Guid.Empty
@@ -103,29 +102,28 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
                                    : config
         select sanitized;
 
-    static Outcome<Seq<TunnelConfig>> TryDeserialize(string data) =>
-        TryCatch(() => JsonSerializer.Deserialize<TunnelConfig[]>(data).ToSeq())
-           .Catch(e => AppErrors.InvalidData.WithMessage($"Cannot deserialize data:\n\nError: {e.Message}\n\nData:\n{data}"));
+    static Eff<Seq<TunnelConfig>> TryDeserialize(string data) =>
+        Eff(() => JsonSerializer.Deserialize<TunnelConfig[]>(data).ToSeq())
+      | @catchOf<Error>(e => AppErrors.InvalidData.WithMessage($"Cannot deserialize data:\n\nError: {e.Message}\n\nData:\n{data}"));
 
-    OutcomeAsync<Unit> Save(IsolatedStorageFile store) =>
-        from file in OpenFile(store, FileMode.Create)
+    Aff<Unit> Save(IsolatedStorageFile store) =>
+        from file in SuccessEff(OpenFile(store, FileMode.Create))
         from ____ in use(file, Save)
         select unit;
 
-    OutcomeAsync<Unit> Save(Stream dataFile) =>
-        TryCatch(async () => {
-                     var writer = new StreamWriter(dataFile);
-                     if (TrySerialize(inMemoryStorage.Values.ToSeq()).IfFail(out var error, out var data))
-                         return FailedOutcome<Unit>(error);
+    Aff<Unit> Save(Stream dataFile) =>
+        from writer in SuccessEff(new StreamWriter(dataFile))
+        from data in TrySerialize(inMemoryStorage.Values.ToSeq())
+        from ____ in Aff(async () => {
+                             await writer.WriteAsync(data);
+                             await writer.FlushAsync();
+                             return unit;
+                         })
+        select unit;
 
-                     await writer.WriteAsync(data);
-                     await writer.FlushAsync();
-                     return unit;
-                 });
+    static Eff<string> TrySerialize(Seq<TunnelConfig> data) =>
+        Eff(() => JsonSerializer.Serialize(data));
 
-    static Outcome<string> TrySerialize(Seq<TunnelConfig> data) =>
-        TryCatch(() => JsonSerializer.Serialize(data));
-
-    static Outcome<IsolatedStorageFileStream> OpenFile(IsolatedStorageFile store, FileMode mode) =>
-        TryCatch(() => store.OpenFile("ssh-manager.json", mode));
+    static Eff<IsolatedStorageFileStream> OpenFile(IsolatedStorageFile store, FileMode mode) =>
+        Eff(() => store.OpenFile("ssh-manager.json", mode));
 }

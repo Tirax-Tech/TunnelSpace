@@ -10,12 +10,12 @@ namespace Tirax.TunnelSpace.Services.Akka;
 
 public interface ISshController : IDisposable
 {
-    OutcomeAsync<IObservable<bool>> Start();
+    Aff<IObservable<bool>> Start();
 }
 
 sealed class SshControllerWrapper(IActorRef actor) : ISshController
 {
-    public OutcomeAsync<IObservable<bool>> Start() =>
+    public Aff<IObservable<bool>> Start() =>
         actor.SafeAsk<IObservable<bool>>(nameof(Start));
 
     public void Dispose() =>

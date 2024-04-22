@@ -5,8 +5,8 @@ namespace Tirax.TunnelSpace.Helpers;
 
 public static class ObservableExtensions
 {
-    public static IDisposable SubscribeAsync<T>(this IObservable<T> observable, Func<T, OutcomeAsync<Unit>> handler) =>
-        observable.Select(x => Observable.FromAsync(async () => await handler(x)))
+    public static IDisposable SubscribeAsync<T>(this IObservable<T> observable, Func<T, Aff<Unit>> handler) =>
+        observable.Select(x => Observable.FromAsync(async () => await handler(x).RunUnit()))
                   .Concat()
                   .Subscribe();
 

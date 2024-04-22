@@ -4,6 +4,12 @@ namespace RZ.Foundation;
 
 public static class PreludeX
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Eff<Unit> eff(Action action) => Eff(() => { action(); return unit; });
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Aff<Unit> aff(Task action) => Aff(async () => { await action; return unit; });
+
     public static OutcomeAsync<T> TryCatch<T>(Func<Task<Outcome<T>>> handler) =>
         from v in TryAsync(handler).ToOutcome()
         from result in v.ToAsync()

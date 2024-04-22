@@ -12,14 +12,14 @@ public sealed record TunnelState(TunnelConfig Config, bool IsRunning);
 
 public interface ISshManager
 {
-    OutcomeAsync<Seq<TunnelState>> RetrieveState();
+    Aff<Seq<TunnelState>> RetrieveState();
 
-    OutcomeAsync<Unit> AddTunnel(TunnelConfig config);
-    OutcomeAsync<Unit> UpdateTunnel(TunnelConfig config);
-    OutcomeAsync<Unit> DeleteTunnel(Guid tunnelId);
+    Aff<Unit> AddTunnel(TunnelConfig config);
+    Aff<Unit> UpdateTunnel(TunnelConfig config);
+    Aff<Unit> DeleteTunnel(Guid tunnelId);
 
-    OutcomeAsync<Unit> StartTunnel(Guid tunnelId);
-    OutcomeAsync<Unit> StopTunnel(Guid tunnelId);
+    Aff<Unit> StartTunnel(Guid tunnelId);
+    Aff<Unit> StopTunnel(Guid tunnelId);
 
     IObservable<Change<TunnelConfig>> Changes { get; }
     IObservable<TunnelState> TunnelRunningStateChanges { get; }
@@ -27,16 +27,16 @@ public interface ISshManager
 
 public sealed class SshManager(IUniqueId uniqueId, IActorRef manager) : ISshManager
 {
-    public OutcomeAsync<Seq<TunnelState>> RetrieveState() =>
+    public Aff<Seq<TunnelState>> RetrieveState() =>
         from configs in manager.SafeAsk<TunnelState[]>(nameof(RetrieveState))
         select configs.ToSeq();
 
-    public OutcomeAsync<Unit> AddTunnel(TunnelConfig config) => manager.SafeAsk<Unit>((nameof(AddTunnel), config));
-    public OutcomeAsync<Unit> UpdateTunnel(TunnelConfig config) => manager.SafeAsk<Unit>((nameof(UpdateTunnel), config));
-    public OutcomeAsync<Unit> DeleteTunnel(Guid tunnelId) => manager.SafeAsk<Unit>((nameof(DeleteTunnel), tunnelId));
+    public Aff<Unit> AddTunnel(TunnelConfig config) => manager.SafeAsk<Unit>((nameof(AddTunnel), config));
+    public Aff<Unit> UpdateTunnel(TunnelConfig config) => manager.SafeAsk<Unit>((nameof(UpdateTunnel), config));
+    public Aff<Unit> DeleteTunnel(Guid tunnelId) => manager.SafeAsk<Unit>((nameof(DeleteTunnel), tunnelId));
 
-    public OutcomeAsync<Unit> StartTunnel(Guid tunnelId)  => manager.SafeAsk<Unit>((nameof(StartTunnel), tunnelId));
-    public OutcomeAsync<Unit> StopTunnel(Guid tunnelId)   => manager.SafeAsk<Unit>((nameof(StopTunnel), tunnelId));
+    public Aff<Unit> StartTunnel(Guid tunnelId)  => manager.SafeAsk<Unit>((nameof(StartTunnel), tunnelId));
+    public Aff<Unit> StopTunnel(Guid tunnelId)   => manager.SafeAsk<Unit>((nameof(StopTunnel), tunnelId));
 
     public IObservable<Change<TunnelConfig>> Changes { get; } = manager.CreateObservable<Change<TunnelConfig>>(uniqueId);
     public IObservable<TunnelState> TunnelRunningStateChanges { get; } = manager.CreateObservable<TunnelState>(uniqueId);
@@ -98,39 +98,40 @@ public sealed class SshManagerActor : UntypedUnitActor, IWithUnboundedStash
             _ => Unhandled(message)
         };
 
-    Outcome<TunnelState[]> RetrieveState() =>
-        tunnels.Values.Map(t => new TunnelState(t.Config, t.Controller.IsSome)).ToArray();
+    Eff<TunnelState[]> RetrieveState() =>
+        SuccessEff(tunnels.Values.Map(t => new TunnelState(t.Config, t.Controller.IsSome)).ToArray());
 
-    OutcomeAsync<Unit> AddTunnel(TunnelConfig config) =>
-        storage.Add(config).Map(_ => unit)
-      | @do<Unit>(_ => {
-                      tunnels[config.Id!.Value] = new SshTunnelItem(config);
-                      changes.OnNext(Change<TunnelConfig>.Added(config));
-                  });
+    Aff<Unit> AddTunnel(TunnelConfig config) =>
+        from _1 in storage.Add(config).Map(_ => unit)
+        from _2 in eff(() => {
+                           tunnels[config.Id!.Value] = new SshTunnelItem(config);
+                           changes.OnNext(Change<TunnelConfig>.Added(config));
+                       })
+        select unit;
 
-    OutcomeAsync<Unit> UpdateTunnel(TunnelConfig config) =>
-        from old in tunnels.Get(config.Id!.Value).ToOutcome()
+    Aff<Unit> UpdateTunnel(TunnelConfig config) =>
+        from old in tunnels.Get(config.Id!.Value).ToEff()
         from _1 in storage.Update(config)
-        from _2 in StopController(old)
-                 | ifFail(AppErrors.ControllerNotStarted, unit)
-                 | @do<Unit>(_ => {
-                                 tunnels[config.Id!.Value] = new(config);
-                                 changes.OnNext(Change<TunnelConfig>.Mapped(old.Config, config));
-                             })
+        from _2 in StopController(old) | @catch(AppErrors.ControllerNotStarted, unit)
+        from _3 in eff(() => {
+                           tunnels[config.Id!.Value] = new(config);
+                           changes.OnNext(Change<TunnelConfig>.Mapped(old.Config, config));
+                       })
         select unit;
 
-    OutcomeAsync<Unit> DeleteTunnel(Guid tunnelId) =>
-        from tunnel in tunnels.TakeOut(tunnelId).ToOutcome() | CatchKeyNotFound(tunnelId)
-        from _1 in StopController(tunnel) | ifFail(AppErrors.ControllerNotStarted, unit)
+    Aff<Unit> DeleteTunnel(Guid tunnelId) =>
+        from tunnel in tunnels.TakeOut(tunnelId).ToEff() | CatchKeyNotFound(tunnelId)
+        from _1 in StopController(tunnel) | @catch(AppErrors.ControllerNotStarted, unit)
         from _2 in storage.Delete(tunnelId)
-                 | @do<TunnelConfig>(_ => changes.OnNext(Change<TunnelConfig>.Removed(tunnel.Config)))
+        from _3 in eff(() => changes.OnNext(Change<TunnelConfig>.Removed(tunnel.Config)))
         select unit;
 
-    OutcomeAsync<Unit> StartTunnel(Guid tunnelId) {
+    Aff<Unit> StartTunnel(Guid tunnelId) {
         return from tunnel in GetTunnel(tunnelId)
-               from actor in tunnel.Controller.ToOutcome() | ifFail(StandardErrors.NotFound, CreateController(tunnel))
+               from actor in tunnel.Controller.ToEff() | @catch(StandardErrors.NotFound, CreateController(tunnel))
                let controller = new SshControllerWrapper(actor)
-               from playState in controller.Start() | @do(SetIsPlaying(tunnel.Config))
+               from playState in controller.Start()
+               let _ = SetIsPlaying(tunnel.Config)
                select unit;
 
         Func<Error, IActorRef> CreateController(SshTunnelItem tunnel) =>
@@ -145,28 +146,28 @@ public sealed class SshManagerActor : UntypedUnitActor, IWithUnboundedStash
             playState => playState.Subscribe(isPlaying => tunnelRunningStateChanges.OnNext(new TunnelState(config, isPlaying)));
     }
 
-    Outcome<Unit> StopTunnel(Guid tunnelId) =>
+    Eff<Unit> StopTunnel(Guid tunnelId) =>
         from tunnel in GetTunnel(tunnelId)
         from _ in StopController(tunnel)
         select unit;
 
-    Outcome<SshTunnelItem> GetTunnel(Guid tunnelId) =>
-        tunnels.Get(tunnelId).ToOutcome() | CatchKeyNotFound(tunnelId);
+    Eff<SshTunnelItem> GetTunnel(Guid tunnelId) =>
+        tunnels.Get(tunnelId).ToEff() | CatchKeyNotFound(tunnelId);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static CatchError CatchKeyNotFound(Guid tunnelId) =>
-        ifFail(StandardErrors.NotFound, _ => StandardErrors.NotFoundFromKey(tunnelId.ToString()));
+        @catch(StandardErrors.NotFound, _ => StandardErrors.NotFoundFromKey(tunnelId.ToString()));
 
-    Outcome<Unit> StopController(SshTunnelItem tunnel) =>
-        from _ in tunnel.Controller.ToOutcome()
-                | FailedOutcome<IActorRef>(AppErrors.ControllerNotStarted)
-                | @do<IActorRef>(actor => {
-                                     var controller = new SshControllerWrapper(actor);
-                                     controller.Dispose();
-                                     var tunnelId = tunnel.Config.Id!.Value;
-                                     tunnels[tunnelId] = tunnel with { Controller = None };
-                                     return unit;
-                                 })
+    Eff<Unit> StopController(SshTunnelItem tunnel) =>
+        from actor in tunnel.Controller.ToEff()
+                    | FailEff<IActorRef>(AppErrors.ControllerNotStarted)
+        from _ in Eff(() => {
+                          var controller = new SshControllerWrapper(actor);
+                          controller.Dispose();
+                          var tunnelId = tunnel.Config.Id!.Value;
+                          tunnels[tunnelId] = tunnel with { Controller = None };
+                          return unit;
+                      })
         select unit;
 
     protected override Unit OnPostStop() {

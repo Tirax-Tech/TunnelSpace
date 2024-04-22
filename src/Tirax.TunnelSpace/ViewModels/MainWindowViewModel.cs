@@ -10,9 +10,9 @@ using Tirax.TunnelSpace.Helpers;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public readonly record struct SidebarItem(string Name, Func<OutcomeAsync<PageModelBase>> GetPage)
+public readonly record struct SidebarItem(string Name, Func<Aff<PageModelBase>> GetPage)
 {
-    public static implicit operator SidebarItem((string Name, Func<OutcomeAsync<PageModelBase>> GetPage) tuple) =>
+    public static implicit operator SidebarItem((string Name, Func<Aff<PageModelBase>> GetPage) tuple) =>
         new(tuple.Name, tuple.GetPage);
 }
 
@@ -53,10 +53,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
                        .ToProperty(this, x => x.ShowMenu);
 
         BackCommand = ReactiveCommand.Create<Unit, Unit>(_ => CloseCurrentView());
-        GotoPageCommand = ReactiveCommand.CreateFromTask<string, Outcome<Unit>>
+        GotoPageCommand = ReactiveCommand.CreateFromTask<string, Unit>
             (async page => await SidebarItems.Find(x1 => x1.Name == page)
                                              .Map(x2 => x2.GetPage().Map(Reset))
-                                             .IfNone(unit));
+                                             .IfNone(unitAff)
+                                             .RunUnit());
     }
 
     static TextBlock CreateTitleText(string text) =>
@@ -129,7 +130,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
     public Unit SetSidebar(Seq<SidebarItem> items) =>
         ___(this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)));
 
-    public ReactiveCommand<string, Outcome<Unit>> GotoPageCommand { get; }
+    public ReactiveCommand<string, Unit> GotoPageCommand { get; }
 
     #endregion
 }

@@ -12,13 +12,13 @@ namespace Tirax.TunnelSpace.Flows;
 
 public interface IConnectionSelectionFlow
 {
-    OutcomeAsync<PageModelBase> Create();
+    Aff<PageModelBase> Create();
 }
 
 public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager,
                                             IUniqueId uniqueId) : IConnectionSelectionFlow
 {
-    public OutcomeAsync<PageModelBase> Create() {
+    public Aff<PageModelBase> Create() {
         return sshManager.RetrieveState().Map(create);
 
         PageModelBase create(Seq<TunnelState> allData) {
@@ -74,22 +74,26 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         return unit;
     }
 
-    OutcomeAsync<Unit> Update(TunnelConfig config) {
+    Aff<Unit> Update(TunnelConfig config) {
         var updated = config.Id is null
                           ? sshManager.AddTunnel(config with { Id = uniqueId.NewGuid() })
                           : sshManager.UpdateTunnel(config);
-        return updated | @do<Unit>(_ => mainWindow.CloseCurrentView());
+        return from _1 in updated
+               from _2 in Eff(mainWindow.CloseCurrentView)
+               select unit;
     }
 
-    OutcomeAsync<Unit> Delete(Guid id) =>
-        sshManager.DeleteTunnel(id) | @do<Unit>(_ => mainWindow.CloseCurrentView());
+    Aff<Unit> Delete(Guid id) =>
+        from _1 in sshManager.DeleteTunnel(id)
+        from _2 in Eff(mainWindow.CloseCurrentView)
+        select unit;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    OutcomeAsync<Unit> Play(ConnectionInfoPanelViewModel vm) =>
+    Aff<Unit> Play(ConnectionInfoPanelViewModel vm) =>
         sshManager.StartTunnel(vm.Config.Id!.Value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    OutcomeAsync<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
+    Aff<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
         sshManager.StopTunnel(vm.Config.Id!.Value);
 
     Func<Error, Unit> LogError(string action) =>
