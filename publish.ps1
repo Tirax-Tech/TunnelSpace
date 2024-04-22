@@ -1,0 +1,1 @@
+dotnet publish ./src/Tirax.TunnelSpace -c Release -o ./publish -r win-x64 --self-contained

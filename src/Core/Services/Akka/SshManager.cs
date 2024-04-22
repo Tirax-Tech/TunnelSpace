@@ -112,7 +112,7 @@ public sealed class SshManagerActor : UntypedUnitActor, IWithUnboundedStash
         from old in tunnels.Get(config.Id!.Value).ToOutcome()
         from _1 in storage.Update(config)
         from _2 in StopController(old)
-                 | ifError(AppErrors.ControllerNotStarted, unit)
+                 | ifFail(AppErrors.ControllerNotStarted, unit)
                  | @do<Unit>(_ => {
                                  tunnels[config.Id!.Value] = new(config);
                                  changes.OnNext(Change<TunnelConfig>.Mapped(old.Config, config));
@@ -121,14 +121,14 @@ public sealed class SshManagerActor : UntypedUnitActor, IWithUnboundedStash
 
     OutcomeAsync<Unit> DeleteTunnel(Guid tunnelId) =>
         from tunnel in tunnels.TakeOut(tunnelId).ToOutcome() | CatchKeyNotFound(tunnelId)
-        from _1 in StopController(tunnel) | ifError(AppErrors.ControllerNotStarted, unit)
+        from _1 in StopController(tunnel) | ifFail(AppErrors.ControllerNotStarted, unit)
         from _2 in storage.Delete(tunnelId)
                  | @do<TunnelConfig>(_ => changes.OnNext(Change<TunnelConfig>.Removed(tunnel.Config)))
         select unit;
 
     OutcomeAsync<Unit> StartTunnel(Guid tunnelId) {
         return from tunnel in GetTunnel(tunnelId)
-               from actor in tunnel.Controller.ToOutcome() | ifError(StandardErrors.NotFound, CreateController(tunnel))
+               from actor in tunnel.Controller.ToOutcome() | ifFail(StandardErrors.NotFound, CreateController(tunnel))
                let controller = new SshControllerWrapper(actor)
                from playState in controller.Start() | @do(SetIsPlaying(tunnel.Config))
                select unit;
@@ -155,7 +155,7 @@ public sealed class SshManagerActor : UntypedUnitActor, IWithUnboundedStash
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static CatchError CatchKeyNotFound(Guid tunnelId) =>
-        @ifError(StandardErrors.NotFound, _ => StandardErrors.NotFoundFromKey(tunnelId.ToString()));
+        ifFail(StandardErrors.NotFound, _ => StandardErrors.NotFoundFromKey(tunnelId.ToString()));
 
     Outcome<Unit> StopController(SshTunnelItem tunnel) =>
         from _ in tunnel.Controller.ToOutcome()

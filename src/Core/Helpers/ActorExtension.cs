@@ -32,9 +32,9 @@ public static class ActorExtension
         ActorTaskScheduler.RunTask(async () => {
                                        var result = await message;
                                        var final = result.MapFailure(errorMapper.IfNone(identity))
-                                                 | ifError<T>(e => e.IsExceptional
-                                                                      ? e.Append(StandardErrors.StackTrace(e.ToException().StackTrace!))
-                                                                      : e);
+                                                 | ifFail(e => e.IsExceptional
+                                                                   ? e.Append(StandardErrors.StackTrace(e.ToException().StackTrace!))
+                                                                   : e);
                                        target.TellUnit(final, sender.ToNullable() ?? ActorRefs.NoSender);
                                    });
         return unit;

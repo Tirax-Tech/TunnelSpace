@@ -32,7 +32,7 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
     public OutcomeAsync<Unit> Init() {
         logger.Information("Initializing storage...");
         return from _ in use(GetStore, Load)
-                       | ifError(AppErrors.InvalidData, e => {
+                       | ifFail(AppErrors.InvalidData, e => {
                                                            logger.Error(e, "Data corrupted! Use new storage");
                                                            return Seq.empty<TunnelConfig>();
                                                        })
