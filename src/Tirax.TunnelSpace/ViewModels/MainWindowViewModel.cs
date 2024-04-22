@@ -127,7 +127,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
     public Seq<SidebarItem> SidebarItems => sidebarItems;
 
     public Unit SetSidebar(Seq<SidebarItem> items) =>
-        ___(this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)));
+        this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)).Ignore();
 
     public ReactiveCommand<string, Outcome<Unit>> GotoPageCommand { get; }
 

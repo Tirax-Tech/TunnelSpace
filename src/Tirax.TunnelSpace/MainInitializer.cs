@@ -21,7 +21,7 @@ sealed class MainInitializer : IAppInit
                      Ssh.Initialize(logger);
 
                      shutdown = () => akka.Shutdown()
-                                    | @outcomeFailed(e => logger.Error(e, "Error during shutdown"))
+                                    | @ifFail(e => logger.Error(e, "Error during shutdown"))
                                     | @do<Unit>(_ => logger.Information("Shutdown completed"));
 
                      var storage = provider.GetRequiredService<ITunnelConfigStorage>();
