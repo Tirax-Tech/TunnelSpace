@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using RZ.Foundation.Functional;
 using Serilog;
 using Tirax.TunnelSpace.Flows;
 using Tirax.TunnelSpace.Services;
@@ -10,7 +11,7 @@ namespace Tirax.TunnelSpace;
 
 sealed class MainInitializer : IAppInit
 {
-    Func<OutcomeAsync<Unit>> shutdown = () => unit;
+    Func<OutcomeAsync<Unit>> shutdown = () => FailedOutcomeAsync<Unit>(StandardErrors.Unexpected);
     ILogger logger = default!;
 
     public OutcomeAsync<Unit> Start(IAppMainWindow vm) =>
@@ -21,9 +22,7 @@ sealed class MainInitializer : IAppInit
 
                      Ssh.Initialize(logger);
 
-                     shutdown = () => akka.Shutdown()
-                                    | @ifFail(e => logger.Error(e, "Error during shutdown"))
-                                    | @do<Unit>(_ => logger.Information("Shutdown completed"));
+                     shutdown = () => akka.Shutdown();
 
                      var storage = provider.GetRequiredService<ITunnelConfigStorage>();
                      var init = await (from _1 in storage.Init()
@@ -35,7 +34,9 @@ sealed class MainInitializer : IAppInit
                  }) | failDo(async e => await DisplayError(vm)(e));
 
     public OutcomeAsync<Unit> Shutdown() =>
-        shutdown();
+        shutdown()
+      | @ifFail(e => logger.Error(e, "Error during shutdown"))
+      | @do<Unit>(_ => logger.Information("Shutdown completed"));
 
     static ServiceProvider CreateDiContainer(IAppMainWindow mainVm) =>
         TunnelSpaceServices.Setup(new ServiceCollection())

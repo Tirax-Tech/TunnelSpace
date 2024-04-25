@@ -39,7 +39,7 @@ akka.actor.ask-timeout = 10s
     }
 
     public OutcomeAsync<Unit> Shutdown() =>
-        TryAsync(async () => await System.CoordinatedShutdown()).ToOutcome();
+        System.CoordinatedShutdown();
 
     static ActorSystem InitSystem(IServiceProvider sp) {
         var config = BootstrapSetup.Create().WithConfig(ConfigurationFactory.ParseString(ConfigHocon));

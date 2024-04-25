@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.ReactiveUI;
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using LanguageExt.UnitsOfMeasure;
 
@@ -16,7 +17,7 @@ sealed class Program
         var initializer = new MainInitializer();
         return BuildApp(initializer)
               .StartWithClassicDesktopLifetime(args)
-              .SideEffect(_ => Task.Run(initializer.Shutdown)
+              .SideEffect(_ => Task.Run(async () => await initializer.Shutdown())
                                    .Wait(30.Seconds()));
     }
 

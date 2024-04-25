@@ -14,11 +14,11 @@ public static class ActorExtension
     static Props DependencyProps<T>(this ActorSystem sys, params object[] parameters) where T : ActorBase =>
         DependencyResolver.For(sys).Props<T>(parameters);
 
-    public static Task<Unit> CoordinatedShutdown(this ActorSystem system, Option<CS.Reason> reason = default) =>
-        Task.Run(async () => {
-                     await CS.Get(system).Run(reason.IfNone(CS.ClrExitReason.Instance));
-                     return unit;
-                 });
+    public static OutcomeAsync<Unit> CoordinatedShutdown(this ActorSystem system, Option<CS.Reason> reason = default) =>
+        (EitherAsync<Error, Unit>)Task.Run(async () => {
+                                               await CS.Get(system).Run(reason.IfNone(CS.ClrExitReason.Instance));
+                                               return unit;
+                                           });
 
     public static IActorRef CreateActor<T>(this ActorSystem sys, string name, params object[] parameters) where T : ActorBase =>
         sys.ActorOf(sys.DependencyProps<T>(parameters), name);
