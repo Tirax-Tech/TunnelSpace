@@ -32,6 +32,8 @@ public class ConnectionInfoPanelViewModel : ViewModelBase
 
     public bool IsPlaying => isPlaying.Value;
 
+    public Guid Key => Config.Id!.Value;
+
     public TunnelConfig Config { get; }
 
     public ReactiveCommand<Unit,bool> PlayOrStop { get; }
@@ -43,4 +45,10 @@ public class ConnectionInfoPanelViewModel : ViewModelBase
         this.RaisePropertyChanged(nameof(IsPlaying));
         return unit;
     }
+
+    public override bool Equals(object? obj) =>
+        obj is ConnectionInfoPanelViewModel other && Config.Id == other.Config.Id;
+
+    public override int GetHashCode() =>
+        Config.Id.GetHashCode();
 }

@@ -3,10 +3,13 @@ using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using Akka.Dispatch;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using ReactiveUI;
 using Tirax.TunnelSpace.Helpers;
+using Dispatcher = Avalonia.Threading.Dispatcher;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
@@ -18,9 +21,9 @@ public readonly record struct SidebarItem(string Name, Func<OutcomeAsync<PageMod
 
 public interface IAppMainWindow
 {
-    Unit      CloseCurrentView();
-    Unit      PushView(PageModelBase replacement);
-    Unit      Reset(PageModelBase replacement);
+    ValueTask<Unit> CloseCurrentView();
+    ValueTask<Unit>           PushView(PageModelBase replacement);
+    ValueTask<Unit>           Reset(PageModelBase replacement);
 
     Unit SetSidebar(Seq<SidebarItem> items);
 }
@@ -52,10 +55,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
                        .Select(_ => history.Count == 1)
                        .ToProperty(this, x => x.ShowMenu);
 
-        BackCommand = ReactiveCommand.Create<Unit, Unit>(_ => CloseCurrentView());
+        BackCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ => await CloseCurrentView());
         GotoPageCommand = ReactiveCommand.CreateFromTask<string, Outcome<Unit>>
             (async page => await SidebarItems.Find(x1 => x1.Name == page)
-                                             .Map(x2 => x2.GetPage().Map(Reset))
+                                             .Map(x2 => from view in x2.GetPage()
+                                                        from _2 in TryCatch(async () => await Reset(view))
+                                                        select unit)
                                              .IfNone(unit));
     }
 
@@ -88,11 +93,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
         return unit;
     }
 
-    public Unit PushView(PageModelBase view) =>
-        ChangeView(() => {
+    public ValueTask<Unit> PushView(PageModelBase view) =>
+        RunOnUiThread(() => ChangeView(() => {
                        history.Push(view);
                        return unit;
-                   });
+                   }));
 
     static object GetViewHeader(PageModelBase view) =>
         view.Header switch
@@ -102,21 +107,29 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
             _        => view.Header
         };
 
-    public Unit CloseCurrentView() =>
-        ChangeView(ToUnit(history.Pop));
+    public ValueTask<Unit> CloseCurrentView() =>
+        RunOnUiThread(() => ChangeView(ToUnit(history.Pop)));
 
-    public Unit Reset(PageModelBase replacement) =>
-        ChangeView(() => {
-                       history.Clear();
-                       history.Push(replacement);
-                       return unit;
-                   });
+    public ValueTask<Unit> Reset(PageModelBase replacement) {
+        return RunOnUiThread(run);
+
+        Unit run() => ChangeView(() => {
+                              history.Clear();
+                              history.Push(replacement);
+                              return unit;
+                          });
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     Unit ChangeView(Func<Unit> change) {
         this.ChangeProperty(nameof(CurrentViewModel), change);
         return RefreshHeader();
     }
+
+    static async ValueTask<Unit> RunOnUiThread(Func<Unit> action) =>
+        Dispatcher.UIThread.CheckAccess()
+            ? action()
+            : await Dispatcher.UIThread.InvokeAsync(action);
 
     #endregion
 

@@ -3,10 +3,13 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ma="clr-namespace:Material.Styles.Assists;assembly=Material.Styles"
+             xmlns:vm="using:Tirax.TunnelSpace.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="Tirax.TunnelSpace.Views.SearchHeaderView">
+             x:Class="Tirax.TunnelSpace.Views.SearchHeaderView"
 
-    <TextBox UseFloatingWatermark="True" Classes="dense" Theme="{StaticResource FilledTextBox}"
+             x:DataType="vm:SearchHeaderViewModel">
+
+    <TextBox Text="{Binding Text}" UseFloatingWatermark="True" Classes="dense" Theme="{StaticResource FilledTextBox}"
              CornerRadius="100" Width="360" Margin="8"
              ma:TextFieldAssist.Label="Search connection" DockPanel.Dock="Top" />
 </UserControl>

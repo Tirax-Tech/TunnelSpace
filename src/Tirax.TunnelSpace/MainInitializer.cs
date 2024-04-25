@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using Tirax.TunnelSpace.Flows;
@@ -31,7 +32,7 @@ sealed class MainInitializer : IAppInit
                                        from _3 in main.Start()
                                        select unit);
                      return init.Unwrap();
-                 }) | failDo(DisplayError(vm));
+                 }) | failDo(async e => await DisplayError(vm)(e));
 
     public OutcomeAsync<Unit> Shutdown() =>
         shutdown();
@@ -43,6 +44,6 @@ sealed class MainInitializer : IAppInit
                            .AddSingleton<IConnectionSelectionFlow, ConnectionSelectionFlow>()
                            .BuildServiceProvider();
 
-    static Func<Error, Unit> DisplayError(IAppMainWindow mainVm) =>
+    static Func<Error, ValueTask<Unit>> DisplayError(IAppMainWindow mainVm) =>
         e => mainVm.Reset(new LoadingScreenViewModel(e.Exception.IfSome(out var err) ? err.ToString() : e.Message));
 }

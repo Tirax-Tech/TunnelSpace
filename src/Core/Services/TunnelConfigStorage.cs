@@ -31,7 +31,7 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
 
     public OutcomeAsync<Unit> Init() {
         logger.Information("Initializing storage...");
-        return from _ in use(GetStore, Load)
+        return from _ in GetStore().use(Load)
                        | ifFail(AppErrors.InvalidData, e => {
                                                            logger.Error(e, "Data corrupted! Use new storage");
                                                            return Seq.empty<TunnelConfig>();
@@ -72,19 +72,19 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
 
     OutcomeAsync<T> ChangeState<T>(Func<Outcome<T>> action) =>
         from result in action()
-        from _ in use(GetStore, Save)
+        from _ in GetStore().use(Save)
         select result;
 
     OutcomeAsync<T> ChangeState<T>(Func<T> action) =>
         from result in TryCatch(action)
-        from _ in use(GetStore, Save)
+        from _ in GetStore().use(Save)
         select result;
 
     static IsolatedStorageFile GetStore() => IsolatedStorageFile.GetUserStoreForApplication();
 
     OutcomeAsync<Seq<TunnelConfig>> Load(IsolatedStorageFile store) =>
         from file in OpenFile(store, FileMode.OpenOrCreate)
-        from ret in use(file, Load)
+        from ret in file.use(Load)
         select ret;
 
     OutcomeAsync<Seq<TunnelConfig>> Load(Stream dataFile) =>
@@ -109,8 +109,8 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
 
     OutcomeAsync<Unit> Save(IsolatedStorageFile store) =>
         from file in OpenFile(store, FileMode.Create)
-        from ____ in use(file, Save)
-        select unit;
+        from ret in file.use(Save)
+        select ret;
 
     OutcomeAsync<Unit> Save(Stream dataFile) =>
         TryCatch(async () => {
@@ -118,6 +118,7 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
                      if (TrySerialize(inMemoryStorage.Values.ToSeq()).IfFail(out var error, out var data))
                          return FailedOutcome<Unit>(error);
 
+                     Console.WriteLine($"Position {dataFile.Position}");
                      await writer.WriteAsync(data);
                      await writer.FlushAsync();
                      return unit;

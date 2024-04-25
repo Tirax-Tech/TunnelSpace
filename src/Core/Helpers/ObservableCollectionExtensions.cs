@@ -1,5 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using DynamicData;
+using DynamicData.Kernel;
 using RZ.Foundation.Functional;
 
 namespace Tirax.TunnelSpace.Helpers;
@@ -16,12 +18,15 @@ public static class ObservableCollectionExtensions
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Outcome<T> ReplaceFirst<T>(this ObservableCollection<T> collection, Predicate<T> itemToReplace, T newData) =>
-        collection.ApplyEffectFirstItem(itemToReplace, i => collection[i] = newData);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Outcome<T> Remove<T>(this ObservableCollection<T> collection, Predicate<T> itemToDelete) =>
-        collection.ApplyEffectFirstItem(itemToDelete, collection.RemoveAt);
+    public static Outcome<T> Replace<T>(this SourceCache<T, Guid> collection, Guid key, T newData) where T : notnull {
+        var optValue = collection.Lookup(key);
+        if (optValue.HasValue) {
+            collection.AddOrUpdate(newData);
+            return optValue.Value;
+        }
+        else
+            return StandardErrors.NotFound;
+    }
 
     static Outcome<T> ApplyEffectFirstItem<T>(this IReadOnlyList<T> collection, Predicate<T> itemFinder, Action<int> effect) =>
         collection.TryFindIndex(itemFinder).ToOutcome()

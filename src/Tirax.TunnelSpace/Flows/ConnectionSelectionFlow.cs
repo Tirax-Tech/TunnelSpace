@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
+using DynamicData;
 using Serilog;
 using Tirax.TunnelSpace.Domain;
 using Tirax.TunnelSpace.Features.TunnelConfigPage;
@@ -30,21 +31,21 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         }
     }
 
-    Action<Change<TunnelConfig>> ListenStorageChange(ConnectionSelectionViewModel vm) =>
+    Action<LanguageExt.Change<TunnelConfig>> ListenStorageChange(ConnectionSelectionViewModel vm) =>
         change => {
             switch (change) {
                 case EntryAdded<TunnelConfig> add:
-                    vm.TunnelConfigs.Add(CreateInfoVm(add.Value));
+                    vm.AllConnections.AddOrUpdate(CreateInfoVm(add.Value));
                     break;
 
                 case EntryMapped<TunnelConfig, TunnelConfig> update:
-                    var result = vm.TunnelConfigs.ReplaceFirst(item => item.Config.Id == update.From.Id, CreateInfoVm(update.To));
+                    var result = vm.AllConnections.Replace(update.From.Id!.Value, CreateInfoVm(update.To));
                     if (result.IfFail(out var e, out _))
                         logger.Warning(e, "Cannot find {TunnelId} in the storage. Probably bug!", update.From.Id);
                     break;
 
                 case EntryRemoved<TunnelConfig> delete:
-                    vm.TunnelConfigs.Remove(item => item.Config.Id == delete.OldValue.Id);
+                    vm.AllConnections.Edit(updater => updater.RemoveKey(delete.OldValue.Id!.Value));
                     break;
 
                 default:
