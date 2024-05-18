@@ -1,9 +1,9 @@
 ﻿using Avalonia;
 using Avalonia.ReactiveUI;
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using LanguageExt.UnitsOfMeasure;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Tirax.TunnelSpace;
 
@@ -23,7 +23,7 @@ sealed class Program
 
     static AppBuilder BuildApp(IAppInit init) =>
         // Application must be created inside the Configure function!
-        AppBuilder.Configure(() => new App(init))
+        AppBuilder.Configure(() => ActivatorUtilities.CreateInstance<App>(init.BuilderServices(), init))
                   .UsePlatformDetect()
                   .WithInterFont()
                   .LogToTrace()

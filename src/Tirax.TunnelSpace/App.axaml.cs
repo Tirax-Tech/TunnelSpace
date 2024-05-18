@@ -1,25 +1,27 @@
+using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Tirax.TunnelSpace.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using Tirax.TunnelSpace.Views;
 
 namespace Tirax.TunnelSpace;
 
 interface IAppInit
 {
-    OutcomeAsync<Unit> Start(IAppMainWindow vm);
+    IServiceProvider   BuilderServices();
+    OutcomeAsync<Unit> Start();
     OutcomeAsync<Unit> Shutdown();
 }
 
-class App(IAppInit initializer) : Application
+class App(IServiceProvider sp, IAppInit initializer) : Application
 {
     public static readonly IAppInit DoNothing = new DumpInit();
 
     [DesignOnly(true)]
-    public App() : this(DoNothing) { }
+    public App() : this(DoNothing.BuilderServices(), DoNothing) { }
 
     public override void Initialize()
     {
@@ -28,10 +30,9 @@ class App(IAppInit initializer) : Application
 
     public override void OnFrameworkInitializationCompleted() {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop) {
-            var vm = new MainWindowViewModel();
-            desktop.MainWindow = new MainWindow { DataContext = vm };
+            desktop.MainWindow = ActivatorUtilities.CreateInstance<MainWindow>(sp);
 
-            Task.Run(async () => await initializer.Start(vm));
+            Task.Run(async () => await initializer.Start());
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -39,7 +40,10 @@ class App(IAppInit initializer) : Application
 
     sealed class DumpInit : IAppInit
     {
-        public OutcomeAsync<Unit> Start(IAppMainWindow vm) => unit;
+        public IServiceProvider BuilderServices() =>
+            new ServiceCollection().BuildServiceProvider();
+
+        public OutcomeAsync<Unit> Start() => unit;
 
         public OutcomeAsync<Unit> Shutdown() => unit;
     }

@@ -41,7 +41,7 @@ public class ViewLocator : IDataTemplate
     static Option<Type> ViewTypeByFeature(Type modelType) =>
         from t in Some(modelType)
         where t.FullName!.EndsWith("ViewModel", StringComparison.Ordinal)
-        from viewType in GetType(t.FullName![..(t.FullName.Length - 9)])
+        from viewType in GetType(t.FullName![..(t.FullName!.Length - 9)])
         select viewType;
 
     static Option<Type> ViewTypeByFolderConvention(Type modelType) =>
