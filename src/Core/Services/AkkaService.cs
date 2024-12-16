@@ -15,8 +15,8 @@ public interface IAkka
 
     SshManager SshManager { get; }
 
-    Outcome<Unit>      Init();
-    OutcomeAsync<Unit> Shutdown();
+    void Init();
+    Task Shutdown();
 }
 
 public sealed class AkkaService(ILogger logger, IUniqueId uniqueId, IServiceProvider sp) : IAkka
@@ -31,15 +31,14 @@ akka.actor.ask-timeout = 10s
     public ActorSystem System => sys.Value;
     public SshManager SshManager => sshManager ?? throw new InvalidOperationException("Akka not initialized");
 
-    public Outcome<Unit> Init() {
+    public void Init() {
         var manager = System.CreateActor<SshManagerActor>("ssh-manager");
         sshManager = new(uniqueId, manager);
         logger.Information("Akka initialized");
-        return unit;
     }
 
-    public OutcomeAsync<Unit> Shutdown() =>
-        System.CoordinatedShutdown();
+    public Task Shutdown()
+        => System.CoordinatedShutdown();
 
     static ActorSystem InitSystem(IServiceProvider sp) {
         var config = BootstrapSetup.Create().WithConfig(ConfigurationFactory.ParseString(ConfigHocon));

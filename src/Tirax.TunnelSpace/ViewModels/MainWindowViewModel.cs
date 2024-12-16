@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reactive.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Akka.Dispatch;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using ReactiveUI;
@@ -13,19 +13,19 @@ using Dispatcher = Avalonia.Threading.Dispatcher;
 
 namespace Tirax.TunnelSpace.ViewModels;
 
-public readonly record struct SidebarItem(string Name, Func<OutcomeAsync<PageModelBase>> GetPage)
+public readonly record struct SidebarItem(string Name, Func<Task<PageModelBase>> GetPage)
 {
-    public static implicit operator SidebarItem((string Name, Func<OutcomeAsync<PageModelBase>> GetPage) tuple) =>
+    public static implicit operator SidebarItem((string Name, Func<Task<PageModelBase>> GetPage) tuple) =>
         new(tuple.Name, tuple.GetPage);
 }
 
 public interface IAppMainWindow
 {
     ValueTask<Unit> CloseCurrentView();
-    ValueTask<Unit>           PushView(PageModelBase replacement);
-    ValueTask<Unit>           Reset(PageModelBase replacement);
+    ValueTask<Unit> PushView(PageModelBase replacement);
+    ValueTask<Unit> Reset(PageModelBase replacement);
 
-    Unit SetSidebar(Seq<SidebarItem> items);
+    void SetSidebar(IEnumerable<SidebarItem> items);
 }
 
 public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
@@ -56,12 +56,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
                        .ToProperty(this, x => x.ShowMenu);
 
         BackCommand = ReactiveCommand.CreateFromTask<Unit, Unit>(async _ => await CloseCurrentView());
-        GotoPageCommand = ReactiveCommand.CreateFromTask<string, Outcome<Unit>>
-            (async page => await SidebarItems.Find(x1 => x1.Name == page)
-                                             .Map(x2 => from view in x2.GetPage()
-                                                        from _2 in TryCatch(async () => await Reset(view))
-                                                        select unit)
-                                             .IfNone(unit));
+        GotoPageCommand = ReactiveCommand.CreateFromTask<string, Outcome<Unit>>(async page => {
+            if (SidebarItems.Find(x => x.Name == page).IfSome(out var sidebar)){
+                var view = await sidebar.GetPage();
+                return await TryCatch(async () => await Reset(view));
+            }
+            return unit;
+        });
     }
 
     static TextBlock CreateTitleText(string text) =>
@@ -135,12 +136,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IAppMainWindow
 
     #region Menu sidebar
 
-    Seq<SidebarItem> sidebarItems;
+    SidebarItem[] sidebarItems = [];
 
-    public Seq<SidebarItem> SidebarItems => sidebarItems;
+    public SidebarItem[] SidebarItems => sidebarItems;
 
-    public Unit SetSidebar(Seq<SidebarItem> items) =>
-        this.RaiseAndSetIfChanged(ref sidebarItems, items, nameof(SidebarItems)).Ignore();
+    public void SetSidebar(IEnumerable<SidebarItem> items)
+        => this.RaiseAndSetIfChanged(ref sidebarItems, items.ToArray(), nameof(SidebarItems)).Ignore();
 
     public ReactiveCommand<string, Outcome<Unit>> GotoPageCommand { get; }
 

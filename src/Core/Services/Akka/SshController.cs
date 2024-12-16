@@ -2,7 +2,6 @@
 using System.Reactive.Subjects;
 using System.Runtime.CompilerServices;
 using Akka.Actor;
-using RZ.Foundation.Akka;
 using Tirax.TunnelSpace.Domain;
 using Seq = LanguageExt.Seq;
 
@@ -10,52 +9,51 @@ namespace Tirax.TunnelSpace.Services.Akka;
 
 public interface ISshController : IDisposable
 {
-    OutcomeAsync<IObservable<bool>> Start();
+    Task<IObservable<bool>> Start();
 }
 
 sealed class SshControllerWrapper(IActorRef actor) : ISshController
 {
-    public OutcomeAsync<IObservable<bool>> Start() =>
-        actor.SafeAsk<IObservable<bool>>(nameof(Start));
+    public Task<IObservable<bool>> Start()
+        => actor.Ask<IObservable<bool>>(nameof(Start));
 
-    public void Dispose() =>
-        actor.Tell(nameof(Dispose));
+    public void Dispose()
+        => actor.Tell(nameof(Dispose));
 }
 
-public sealed class SshController(TunnelConfig config) : UntypedUnitActor
+public sealed class SshController(TunnelConfig config) : UntypedActor, IDisposable
 {
     BehaviorSubject<bool> state = new(false);
-    Option<Process> process;
+    Process? process;
 
-    protected override Unit OnPostStop() =>
-        CloseCurrentProcess();
-
-    protected override Unit HandleReceive(object message) =>
-        message switch
-        {
-            nameof(ISshController.Start) => Sender.TellUnit(Start()),
-            nameof(IDisposable.Dispose)  => Dispose(),
-
-            "CheckProcess" => process.Iter(p => p.Refresh()),
-
-            _ => Unhandled(message)
-        };
-
-    Outcome<IObservable<bool>> Start() {
-        CloseCurrentProcess();
-        process = StartSshProcess(config);
-        process.Iter(p => {
-                         p.EnableRaisingEvents = true;
-                         p.Exited += (_, _) => CloseCurrentProcess();
-                     });
-        state.OnNext(process.IsSome);
-        return state;
-    }
-
-    Unit Dispose() {
+    public void Dispose() {
         CloseCurrentProcess();
         Self.Tell(PoisonPill.Instance);
-        return unit;
+    }
+
+    protected override void PostStop() {
+        CloseCurrentProcess();
+    }
+
+    protected override void OnReceive(object message) {
+        switch(message) {
+            case nameof(ISshController.Start): Sender.Tell(Start()); break;
+            case nameof(IDisposable.Dispose):  Dispose(); break;
+
+            case "CheckProcess": process?.Refresh(); break;
+
+            default: Unhandled(message); break;
+        }
+    }
+
+    IObservable<bool> Start() {
+        CloseCurrentProcess();
+        var p = StartSshProcess(config);
+        p.EnableRaisingEvents = true;
+        p.Exited += (_, _) => CloseCurrentProcess();
+        process = p;
+        state.OnNext(true);
+        return state;
     }
 
     static Process StartSshProcess(TunnelConfig config) {
@@ -68,17 +66,17 @@ public sealed class SshController(TunnelConfig config) : UntypedUnitActor
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static bool IsPortUnspecified(short port) => port is 0 or 22;
 
-    Unit CloseCurrentProcess() {
-        if (process.IfNone(out var p)) return unit;
+    void CloseCurrentProcess() {
+        if (process is null) return;
 
         state.OnNext(false);
         state.OnCompleted();
         state = new(false);
-        process = None;
+        var p = process;
+        process = null;
 
         using var _ = p;
         if (!p.HasExited)
             p.Kill();
-        return unit;
     }
 }

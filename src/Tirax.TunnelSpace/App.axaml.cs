@@ -12,8 +12,8 @@ namespace Tirax.TunnelSpace;
 interface IAppInit
 {
     IServiceProvider   BuilderServices();
-    OutcomeAsync<Unit> Start();
-    OutcomeAsync<Unit> Shutdown();
+    Task Start();
+    Task Shutdown();
 }
 
 class App(IServiceProvider sp, IAppInit initializer) : Application
@@ -43,8 +43,8 @@ class App(IServiceProvider sp, IAppInit initializer) : Application
         public IServiceProvider BuilderServices() =>
             new ServiceCollection().BuildServiceProvider();
 
-        public OutcomeAsync<Unit> Start() => unit;
+        public Task Start() => Task.CompletedTask;
 
-        public OutcomeAsync<Unit> Shutdown() => unit;
+        public Task Shutdown() => Task.CompletedTask;
     }
 }

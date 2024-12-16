@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using DynamicData;
 using Serilog;
 using Tirax.TunnelSpace.Domain;
@@ -13,22 +14,20 @@ namespace Tirax.TunnelSpace.Flows;
 
 public interface IConnectionSelectionFlow
 {
-    OutcomeAsync<PageModelBase> Create();
+    Task<PageModelBase> Create();
 }
 
 public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainWindow, ISshManager sshManager,
                                             IUniqueId uniqueId) : IConnectionSelectionFlow
 {
-    public OutcomeAsync<PageModelBase> Create() {
-        return sshManager.RetrieveState().Map(create);
+    public async Task<PageModelBase> Create() {
+        var allData = await sshManager.RetrieveState();
 
-        PageModelBase create(Seq<TunnelState> allData) {
-            var configVms = allData.Map(i => CreateInfoVm(i.Config, i.IsRunning));
-            var vm = new ConnectionSelectionViewModel(configVms);
-            sshManager.Changes.Subscribe(ListenStorageChange(vm));
-            vm.NewConnectionCommand.Subscribe(_ => EditConnection());
-            return vm;
-        }
+        var configVms = allData.Map(i => CreateInfoVm(i.Config, i.IsRunning));
+        var vm = new ConnectionSelectionViewModel(configVms);
+        sshManager.Changes.Subscribe(ListenStorageChange(vm));
+        vm.NewConnectionCommand.Subscribe(_ => EditConnection());
+        return vm;
     }
 
     Action<LanguageExt.Change<TunnelConfig>> ListenStorageChange(ConnectionSelectionViewModel vm) =>
@@ -40,8 +39,8 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
 
                 case EntryMapped<TunnelConfig, TunnelConfig> update:
                     var result = vm.AllConnections.Replace(update.From.Id!.Value, CreateInfoVm(update.To));
-                    if (result.IfFail(out var e, out _))
-                        logger.Warning(e, "Cannot find {TunnelId} in the storage. Probably bug!", update.From.Id);
+                    if (result is null)
+                        logger.Warning("Cannot find {TunnelId} in the storage. Probably bug!", update.From.Id);
                     break;
 
                 case EntryRemoved<TunnelConfig> delete:
@@ -56,8 +55,7 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
     ConnectionInfoPanelViewModel CreateInfoVm(TunnelConfig config, bool initialPlaying = default) {
         var vm = new ConnectionInfoPanelViewModel(config);
         vm.Edit.Subscribe(c => EditConnection(c));
-        vm.PlayOrStop.SubscribeAsync(isPlaying => (isPlaying ? Stop(vm) : Play(vm))
-                                                | ifFail(LogError("play or stop")));
+        vm.PlayOrStop.SubscribeAsync(isPlaying => On(isPlaying ? Stop(vm) : Play(vm)).BeforeThrow(e => LogError(e, "play or stop")));
         var isPlaying = sshManager.TunnelRunningStateChanges
                                   .Where(state => state.Config.Id == vm.Config.Id)
                                   .Select(state => state.IsRunning)
@@ -66,36 +64,34 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         return vm;
     }
 
-    Unit EditConnection(Option<TunnelConfig> config = default) {
+    void EditConnection(Option<TunnelConfig> config = default) {
         var view = new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample));
-        view.Save.SubscribeAsync(c => Update(c) | ifFail(LogError("saving tunnel config")));
+        view.Save.SubscribeAsync(c => On(Update(c)).BeforeThrow(e => LogError(e, "saving tunnel config")));
         view.Back.Subscribe(_ => mainWindow.CloseCurrentView());
-        view.Delete.SubscribeAsync(_ => Delete(view.Config.Id!.Value) | ifFail(LogError("deleting tunnel")));
+        view.Delete.SubscribeAsync(_ => On(Delete(view.Config.Id!.Value)).BeforeThrow(e => LogError(e, "deleting tunnel")));
         mainWindow.PushView(view);
-        return unit;
     }
 
-    OutcomeAsync<Unit> Update(TunnelConfig config) {
-        var updated = config.Id is null
-                          ? sshManager.AddTunnel(config with { Id = uniqueId.NewGuid() })
-                          : sshManager.UpdateTunnel(config);
-        return updated | @do<Unit>(_ => mainWindow.CloseCurrentView());
+    async Task Update(TunnelConfig config) {
+        await (config.Id is null
+                   ? sshManager.AddTunnel(config with { Id = uniqueId.NewGuid() })
+                   : sshManager.UpdateTunnel(config));
+        await mainWindow.CloseCurrentView();
     }
 
-    OutcomeAsync<Unit> Delete(Guid id) =>
-        sshManager.DeleteTunnel(id) | @do<Unit>(_ => mainWindow.CloseCurrentView());
+    async Task Delete(Guid id) {
+        await sshManager.DeleteTunnel(id);
+        await mainWindow.CloseCurrentView();
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    OutcomeAsync<Unit> Play(ConnectionInfoPanelViewModel vm) =>
+    Task Play(ConnectionInfoPanelViewModel vm) =>
         sshManager.StartTunnel(vm.Config.Id!.Value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    OutcomeAsync<Unit> Stop(ConnectionInfoPanelViewModel vm) =>
+    Task Stop(ConnectionInfoPanelViewModel vm) =>
         sshManager.StopTunnel(vm.Config.Id!.Value);
 
-    Func<Error, Unit> LogError(string action) =>
-        e => {
-            logger.Error(e, "Error while {Action}", action);
-            return unit;
-        };
+    void LogError(Exception e, string action)
+        => logger.Error(e, "Error while {Action}", action);
 }

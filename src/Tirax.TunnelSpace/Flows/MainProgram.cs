@@ -1,4 +1,5 @@
-﻿using ReactiveUI;
+﻿using System.Threading.Tasks;
+using ReactiveUI;
 using Tirax.TunnelSpace.Domain;
 using Tirax.TunnelSpace.Features.ImportExportPage;
 using Tirax.TunnelSpace.ViewModels;
@@ -13,14 +14,16 @@ static class AppCommands
 
 public interface IMainProgram
 {
-    OutcomeAsync<Unit> Start();
+    Task Start();
 }
 
 public sealed class MainProgram(IAppMainWindow vm, IConnectionSelectionFlow flowConnectionSelection) : IMainProgram
 {
-    public OutcomeAsync<Unit> Start() {
-        var sidebar = Seq<SidebarItem>(("Home", flowConnectionSelection.Create),
-                                       ("Import/Export", () => new ImportExportViewModel()));
+    public Task Start() {
+        var sidebar = new SidebarItem[] {
+            ("Home", flowConnectionSelection.Create),
+            ("Import/Export", () => Task.FromResult<PageModelBase>(new ImportExportViewModel()))
+        };
         vm.SetSidebar(sidebar);
 
         return from model in flowConnectionSelection.Create()

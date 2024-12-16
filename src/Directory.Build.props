@@ -3,8 +3,7 @@
         <LangVersion>preview</LangVersion>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="LanguageExt.Core" Version="4.4.8" />
-        <PackageReference Include="RZ.Foundation" Version="6.4.0" />
+        <PackageReference Include="RZ.Foundation" Version="7.0.0-beta.48" />
         <Compile Include="../CommonGlobalUsings.cs" />
     </ItemGroup>
 </Project>

@@ -23,7 +23,7 @@ public sealed class ConnectionSelectionViewModel : PageModelBase
                                                                                    new(TunnelConfig.CreateSample()))) {
     }
 
-    public ConnectionSelectionViewModel(Seq<ConnectionInfoPanelViewModel> init) {
+    public ConnectionSelectionViewModel(IEnumerable<ConnectionInfoPanelViewModel> init) {
         var searchVm = new SearchHeaderViewModel();
         var keyword = searchVm.WhenAnyValue(x => x.Text).Select(k => k?.Trim());
         allConnections = new SourceCache<ConnectionInfoPanelViewModel, Guid>(m => m.Key);
