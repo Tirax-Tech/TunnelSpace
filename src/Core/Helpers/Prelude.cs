@@ -1,10 +1,21 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Collections;
+using System.Runtime.CompilerServices;
 using RZ.Foundation.Types;
 
 namespace RZ.Foundation;
 
 public static class PreludeX
 {
+    public class ForwardReadOnlyCollection<T>(ICollection<T> collection) : IReadOnlyCollection<T>
+    {
+        public IEnumerator<T>   GetEnumerator() => collection.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => collection.GetEnumerator();
+        public int Count => collection.Count;
+    }
+
+    public static IReadOnlyCollection<T> ToReadOnlyCollection<T>(this ICollection<T> collection)
+        => new ForwardReadOnlyCollection<T>(collection);
+
     [MethodImpl(MethodImplOptions.NoOptimization)]
     public static Unit Ignore<T>(this T _) => unit;
 

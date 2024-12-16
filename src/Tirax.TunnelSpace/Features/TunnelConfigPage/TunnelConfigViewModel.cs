@@ -29,7 +29,7 @@ public sealed class TunnelConfigViewModel : PageModelBase
         Delete = ReactiveCommand.Create<Unit, TunnelConfig>(_ => config);
 
         isNew = this.WhenAnyValue(x => x.Config.Id)
-                    .Select(x => x is null)
+                    .Select(x => x == Guid.Empty)
                     .ToProperty(this, x => x.IsNew);
         this.WhenAnyValue(x => x.IsNew)
             .Select(@new => @new ? "New Connection" : "Edit Connection")

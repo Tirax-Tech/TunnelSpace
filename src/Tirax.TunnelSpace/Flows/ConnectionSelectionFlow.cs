@@ -38,13 +38,13 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
                     break;
 
                 case EntryMapped<TunnelConfig, TunnelConfig> update:
-                    var result = vm.AllConnections.Replace(update.From.Id!.Value, CreateInfoVm(update.To));
+                    var result = vm.AllConnections.Replace(update.From.Id, CreateInfoVm(update.To));
                     if (result is null)
                         logger.Warning("Cannot find {TunnelId} in the storage. Probably bug!", update.From.Id);
                     break;
 
                 case EntryRemoved<TunnelConfig> delete:
-                    vm.AllConnections.Edit(updater => updater.RemoveKey(delete.OldValue.Id!.Value));
+                    vm.AllConnections.Edit(updater => updater.RemoveKey(delete.OldValue.Id));
                     break;
 
                 default:
@@ -68,12 +68,12 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
         var view = new TunnelConfigViewModel(config.IfNone(TunnelConfig.CreateSample));
         view.Save.SubscribeAsync(c => On(Update(c)).BeforeThrow(e => LogError(e, "saving tunnel config")));
         view.Back.Subscribe(_ => mainWindow.CloseCurrentView());
-        view.Delete.SubscribeAsync(_ => On(Delete(view.Config.Id!.Value)).BeforeThrow(e => LogError(e, "deleting tunnel")));
+        view.Delete.SubscribeAsync(_ => On(Delete(view.Config.Id)).BeforeThrow(e => LogError(e, "deleting tunnel")));
         mainWindow.PushView(view);
     }
 
     async Task Update(TunnelConfig config) {
-        await (config.Id is null
+        await (config.Id == Guid.Empty
                    ? sshManager.AddTunnel(config with { Id = uniqueId.NewGuid() })
                    : sshManager.UpdateTunnel(config));
         await mainWindow.CloseCurrentView();
@@ -86,11 +86,11 @@ public sealed class ConnectionSelectionFlow(ILogger logger, IAppMainWindow mainW
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     Task Play(ConnectionInfoPanelViewModel vm) =>
-        sshManager.StartTunnel(vm.Config.Id!.Value);
+        sshManager.StartTunnel(vm.Config.Id);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     Task Stop(ConnectionInfoPanelViewModel vm) =>
-        sshManager.StopTunnel(vm.Config.Id!.Value);
+        sshManager.StopTunnel(vm.Config.Id);
 
     void LogError(Exception e, string action)
         => logger.Error(e, "Error while {Action}", action);

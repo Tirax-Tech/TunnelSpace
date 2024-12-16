@@ -66,7 +66,7 @@ public sealed class SshManagerActor : UntypedActor, IWithUnboundedStash
 
         void InitData(TunnelConfig[] data) {
             tunnels = (from config in data
-                       select KeyValuePair.Create(config.Id!.Value, new SshTunnelItem(config))
+                       select KeyValuePair.Create(config.Id, new SshTunnelItem(config))
                       ).ToDictionary();
             UnbecomeStacked();
             Stash.UnstashAll();
@@ -99,15 +99,15 @@ public sealed class SshManagerActor : UntypedActor, IWithUnboundedStash
 
     async Task AddTunnel(TunnelConfig config) {
         await storage.Add(config);
-        tunnels[config.Id!.Value] = new SshTunnelItem(config);
+        tunnels[config.Id] = new SshTunnelItem(config);
         changes.OnNext(Change<TunnelConfig>.Added(config));
     }
 
     async Task UpdateTunnel(TunnelConfig config) {
-        var old = tunnels.Get(config.Id!.Value).Get();
+        var old = tunnels.Get(config.Id).Get();
         await storage.Update(config);
         StopController(old);
-        tunnels[config.Id!.Value] = new(config);
+        tunnels[config.Id] = new(config);
         changes.OnNext(Change<TunnelConfig>.Mapped(old.Config, config));
     }
 
@@ -143,12 +143,11 @@ public sealed class SshManagerActor : UntypedActor, IWithUnboundedStash
         new ErrorInfoException(StandardErrorCodes.NotFound, $"Tunnel with id {tunnelId} not found");
 
     void StopController(SshTunnelItem tunnel) {
-        if (tunnel.Controller is null)
-            throw new ErrorInfoException(AppErrors.ControllerNotStarted, null);
+        if (tunnel.Controller is null) return;
         var actor = tunnel.Controller;
         var controller = new SshControllerWrapper(actor);
         controller.Dispose();
-        var tunnelId = tunnel.Config.Id!.Value;
+        var tunnelId = tunnel.Config.Id;
         tunnels[tunnelId] = tunnel with { Controller = null };
     }
 

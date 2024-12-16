@@ -7,7 +7,7 @@ public sealed record TunnelConfig(
     string RemoteHost,
     short RemotePort,
     string Name,
-    Guid? Id = default)
+    Guid Id)
 {
-    public static TunnelConfig CreateSample() => new("localhost", 22, 8080, "localhost", 80, "Sample");
+    public static TunnelConfig CreateSample() => new("localhost", 22, 8080, "localhost", 80, "Sample", Guid.Empty);
 }

@@ -1,6 +1,5 @@
 ﻿using System.Collections.Concurrent;
 using System.IO.IsolatedStorage;
-using System.Reactive.Subjects;
 using System.Text.Json;
 using RZ.Foundation.Types;
 using Serilog;
@@ -13,20 +12,16 @@ public interface ITunnelConfigStorage
 {
     Task Init();
 
-    IEnumerable<TunnelConfig> All();
-    Task<TunnelConfig>      Add(TunnelConfig config);
-    Task<TunnelConfig>      Update(TunnelConfig config);
-    Task<TunnelConfig>      Delete(Guid configId);
+    IReadOnlyCollection<TunnelConfig> All();
 
-    IObservable<Change<TunnelConfig>> Changes { get; }
+    Task<TunnelConfig> Add(TunnelConfig config);
+    Task<TunnelConfig> Update(TunnelConfig config);
+    Task<TunnelConfig> Delete(Guid configId);
 }
 
 public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelConfigStorage
 {
     ConcurrentDictionary<Guid, TunnelConfig> inMemoryStorage = new();
-    readonly Subject<Change<TunnelConfig>> changes = new();
-
-    public IObservable<Change<TunnelConfig>> Changes => changes;
 
     public async Task Init() {
         logger.Information("Initializing storage...");
@@ -34,33 +29,30 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
         var (error, result) = await Try(store, Load);
         if (error is ErrorInfoException { Code: AppErrors.InvalidData }){
             logger.Error(error, "Data corrupted! Use new storage");
-            result = [];
-            SaveInMemory(result);
+            SaveInMemory([]);
         }
         else if (error is not null)
             throw new ErrorInfoException(AppErrors.InvalidData, "Invalid storage file data", innerException: error);
+
+        result.Iter(i => inMemoryStorage[i.Id] = i);
         return;
 
         void SaveInMemory(IEnumerable<TunnelConfig> configs) {
-            var loadData = from config in configs select KeyValuePair.Create(config.Id!.Value, config);
+            var loadData = from config in configs select KeyValuePair.Create(config.Id, config);
             inMemoryStorage = new(loadData);
             logger.Information("Storage initialized");
         }
     }
 
-    public IEnumerable<TunnelConfig> All() =>
-        inMemoryStorage.Values;
+    public IReadOnlyCollection<TunnelConfig> All()
+        => inMemoryStorage.Values.ToReadOnlyCollection();
 
-    public Task<TunnelConfig> Add(TunnelConfig config) =>
-        Update(config);
+    public Task<TunnelConfig> Add(TunnelConfig config)
+        => Update(config);
 
     public async Task<TunnelConfig> Update(TunnelConfig config) {
         try{
-            var existed = inMemoryStorage.Get(config.Id!.Value);
-            inMemoryStorage[config.Id!.Value] = config;
-            var message = existed.Match(o => Change<TunnelConfig>.Mapped(o, config),
-                                        () => Change<TunnelConfig>.Added(config));
-            changes.OnNext(message);
+            inMemoryStorage[config.Id] = config;
             return config;
         }
         finally{
@@ -69,30 +61,24 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
     }
 
     public async Task<TunnelConfig> Delete(Guid configId) {
-        try{
-            if (inMemoryStorage.Remove(configId, out var v)){
-                changes.OnNext(Change<TunnelConfig>.Removed(v));
-                return v;
-            }
-            else
-                throw new ErrorInfoException(StandardErrorCodes.NotFound, $"Config with id {configId} not found");
-        }
-        finally{
+        if (inMemoryStorage.Remove(configId, out var v)){
             await Save();
+            return v;
         }
+        throw new ErrorInfoException(StandardErrorCodes.NotFound, $"Config with id {configId} not found");
     }
 
     static IsolatedStorageFile GetStore() => IsolatedStorageFile.GetUserStoreForApplication();
 
-    async Task<IEnumerable<TunnelConfig>> Load(IsolatedStorageFile store) {
+    async Task<TunnelConfig[]> Load(IsolatedStorageFile store) {
         await using var file = OpenFile(store, FileMode.OpenOrCreate);
         return await Load(file);
     }
 
-    async Task<IEnumerable<TunnelConfig>> Load(Stream dataFile) {
+    async Task<TunnelConfig[]> Load(Stream dataFile) {
         var reader = new StreamReader(dataFile);
         var d = await reader.ReadToEndAsync();
-       return string.IsNullOrEmpty(d) ? [] : DeserializeFromOldFormat(d);
+       return string.IsNullOrEmpty(d) ? [] : DeserializeFromOldFormat(d).ToArray();
     }
 
     IEnumerable<TunnelConfig> DeserializeFromOldFormat(string data) {
@@ -126,7 +112,7 @@ public class TunnelConfigStorage(ILogger logger, IUniqueId uniqueId) : ITunnelCo
         var writer = new StreamWriter(dataFile);
         var data = TrySerialize(inMemoryStorage.Values);
 
-        Console.WriteLine($"Position {dataFile.Position}");
+        Console.WriteLine($"Data: {data}");
         await writer.WriteAsync(data);
         await writer.FlushAsync();
     }

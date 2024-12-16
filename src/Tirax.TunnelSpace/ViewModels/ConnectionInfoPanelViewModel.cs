@@ -32,7 +32,7 @@ public class ConnectionInfoPanelViewModel : ViewModelBase
 
     public bool IsPlaying => isPlaying.Value;
 
-    public Guid Key => Config.Id!.Value;
+    public Guid Key => Config.Id;
 
     public TunnelConfig Config { get; }
 
